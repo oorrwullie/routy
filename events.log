@@ -1,0 +1,7 @@
+{Timestamp: 14:29:47 MDT 60-26-2023, Level: INFO, Caller: Main(), Message: Application is running...}{Timestamp: 14:30:10 MDT 60-26-2023, Level: INFO, Caller: shutdown(), Message: 
+Received shutdown signal. Performing graceful shutdown...}{Timestamp: 14:31:48 MDT 60-26-2023, Level: INFO, Caller: Main(), Message: Application is running...}{Timestamp: 14:32:02 MDT 60-26-2023, Level: INFO, Caller: shutdown(), Message: 
+Received shutdown signal. Performing graceful shutdown...}{Timestamp: 14:34:03 MDT 60-26-2023, Level: INFO, Caller: Main(), Message: Application is running...}{Timestamp: 14:34:07 MDT 60-26-2023, Level: INFO, Caller: shutdown(), Message: 
+Received shutdown signal. Performing graceful shutdown...}{Timestamp: 14:37:34 MDT 60-26-2023, Level: INFO, Caller: Main(), Message: Application is running...}{Timestamp: 14:45:19 MDT 60-26-2023, Level: INFO, Caller: shutdown(), Message: 
+Received shutdown signal. Performing graceful shutdown...}{Timestamp: 14:45:24 MDT 60-26-2023, Level: INFO, Caller: Main(), Message: Application is running...}{Timestamp: 14:45:34 MDT 60-26-2023, Level: INFO, Caller: shutdown(), Message: 
+Received shutdown signal. Performing graceful shutdown...}{Timestamp: 14:47:29 MDT 60-26-2023, Level: INFO, Caller: Main(), Message: Application is running...}{Timestamp: 14:47:38 MDT 60-26-2023, Level: INFO, Caller: shutdown(), Message: 
+Received shutdown signal. Performing graceful shutdown...}
