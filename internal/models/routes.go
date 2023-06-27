@@ -15,10 +15,12 @@ func GetRoutes() ([]Route, error) {
 	data := make([]Route, 0)
 
 	res, err := getFileData(routesFilename)
-	if err.Error() == "file not found" {
-		return data, nil
-	} else {
-		return nil, err
+	if err != nil {
+		if err.Error() == "file not found" {
+			return data, nil
+		} else {
+			return nil, err
+		}
 	}
 
 	err = json.Unmarshal(res, &data)

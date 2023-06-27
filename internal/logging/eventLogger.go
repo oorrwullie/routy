@@ -20,7 +20,8 @@ func EventLogger(logChan <-chan EventLogMessage) {
 		logMsg.Timestamp = t.Format("15:04:05 MST 10-02-2006")
 
 		entry := fmt.Sprintf(
-			`{"Timestamp": "%s", "Level": "%s", "Caller": "%s", "Message": "%s"}\n`,
+			`{"Timestamp": "%s", "Level": "%s", "Caller": "%s", "Message": "%s"}
+`,
 			logMsg.Timestamp,
 			logMsg.Level,
 			logMsg.Caller,

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -8,11 +9,7 @@ import (
 
 	"github.com/oorrwullie/routy/internal/handlers"
 	"github.com/oorrwullie/routy/internal/logging"
-)
-
-const (
-	serverPort = "80"
-	hostname   = "localhost"
+	"github.com/oorrwullie/routy/internal/models"
 )
 
 func main() {
@@ -36,9 +33,14 @@ func main() {
 		os.Exit(0)
 	}()
 
+	cfg, err := models.GetConfig()
+	if err != nil {
+		log.Fatal("could not initialize the server")
+	}
+
 	r := handlers.NewRouter(
-		serverPort,
-		hostname,
+		cfg.Port,
+		cfg.Hostname,
 		eventLog,
 	)
 
@@ -49,7 +51,7 @@ func main() {
 		Message: msg,
 	}
 
-	err := r.Route()
+	err = r.Route()
 	if err != nil {
 		eventLog <- logging.EventLogMessage{
 			Level:   "ERROR",

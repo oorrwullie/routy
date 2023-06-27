@@ -12,10 +12,12 @@ func GetDenyList() (*DenyList, error) {
 	data := make([]string, 0)
 
 	res, err := getFileData(denyListFilename)
-	if err.Error() == "file not found" {
-		return &DenyList{list: data}, nil
-	} else {
-		return nil, err
+	if err != nil {
+		if err.Error() == "file not found" {
+			return &DenyList{list: data}, nil
+		} else {
+			return nil, err
+		}
 	}
 
 	err = json.Unmarshal(res, &data)

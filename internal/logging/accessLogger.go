@@ -14,7 +14,8 @@ func AccessLogger(requestChan <-chan *http.Request) {
 		t := time.Now()
 
 		entry := fmt.Sprintf(
-			`{"Timestamp": "%s", "IPAddress": "%s", "URL": "%s", "User-Agent": "%s"}\n`,
+			`{"Timestamp": "%s", "IPAddress": "%s", "URL": "%s", "User-Agent": "%s"}
+`,
 			t.Format("15:04:05 MST 10-02-2006"),
 			GetRequestRemoteAddress(request),
 			request.URL.String(),
