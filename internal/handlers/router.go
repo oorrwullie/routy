@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -9,6 +10,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/oorrwullie/routy/internal/logging"
 	"github.com/oorrwullie/routy/internal/models"
+
+	"golang.org/x/crypto/acme/autocert"
 )
 
 type Router struct {
@@ -30,6 +33,14 @@ func NewRouter(
 }
 
 func (r *Router) Route() error {
+	certDomain := "*." + r.hostname
+
+	m := &autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(certDomain),
+		Cache:      autocert.DirCache("certs"),
+	}
+
 	denyList, err := models.GetDenyList()
 
 	accessLog := make(chan *http.Request)
@@ -74,9 +85,22 @@ func (r *Router) Route() error {
 	}
 
 	server := &http.Server{
-		Addr:    ":" + r.port,
-		Handler: router,
+		Addr:      ":https",
+		TLSConfig: m.TLSConfig(),
+		Handler:   router,
 	}
 
-	return server.ListenAndServe()
+	go func() {
+		log.Fatal(server.ListenAndServeTLS("", ""))
+	}()
+
+	httpServer := &http.Server{
+		Addr: ":http",
+		Handler: m.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			targetURL := "https://" + r.Host + r.URL.Path
+			http.Redirect(w, r, targetURL, http.StatusPermanentRedirect)
+		})),
+	}
+
+	return httpServer.ListenAndServe()
 }
