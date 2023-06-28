@@ -1,11 +1,12 @@
 package handlers
 
 import (
+	"crypto/tls"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/oorrwullie/routy/internal/logging"
@@ -33,14 +34,6 @@ func NewRouter(
 }
 
 func (r *Router) Route() error {
-	certDomain := "*." + r.hostname
-
-	m := &autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(certDomain),
-		Cache:      autocert.DirCache("certs"),
-	}
-
 	denyList, err := models.GetDenyList()
 
 	accessLog := make(chan *http.Request)
@@ -51,12 +44,33 @@ func (r *Router) Route() error {
 		return err
 	}
 
+	list := r.buildAllowList(routes)
+
+	m := &autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(list),
+		Cache:      autocert.DirCache("./certs"),
+	}
+
+	go func() {
+		httpServer := &http.Server{
+			Addr: ":http",
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				targetURL := "https://" + r.Host + r.URL.Path
+				http.Redirect(w, r, targetURL, http.StatusPermanentRedirect)
+			}),
+		}
+
+		httpServer.ListenAndServe()
+
+	}()
+
 	router := mux.NewRouter()
 
 	for _, route := range routes {
 		targetURL, err := url.Parse(route.Target)
 		if err != nil {
-			msg := fmt.Sprintf("Failed to parse target URL for subdomain %s: %v\n", route.Subdomain, err)
+			msg := fmt.Sprintf("failed to parse target URL for subdomain %s: %v\n", route.Subdomain, err)
 			r.eventLog <- logging.EventLogMessage{
 				Level:   "ERROR",
 				Caller:  "Route()->url.Parse()",
@@ -85,22 +99,21 @@ func (r *Router) Route() error {
 	}
 
 	server := &http.Server{
-		Addr:      ":https",
-		TLSConfig: m.TLSConfig(),
-		Handler:   router,
+		Addr:    ":https",
+		Handler: router,
+		TLSConfig: &tls.Config{
+			GetCertificate: m.GetCertificate,
+		},
 	}
 
-	go func() {
-		log.Fatal(server.ListenAndServeTLS("", ""))
-	}()
+	return server.ListenAndServeTLS("", "")
+}
 
-	httpServer := &http.Server{
-		Addr: ":http",
-		Handler: m.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			targetURL := "https://" + r.Host + r.URL.Path
-			http.Redirect(w, r, targetURL, http.StatusPermanentRedirect)
-		})),
+func (r *Router) buildAllowList(subdomains []models.Route) string {
+	var l []string
+	for _, s := range subdomains {
+		l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, r.hostname))
 	}
 
-	return httpServer.ListenAndServe()
+	return strings.Join(l[:], ",")
 }
