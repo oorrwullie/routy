@@ -5,19 +5,22 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 const dataDir string = "routy"
 
 func getFileData(filename string) ([]byte, error) {
-	home, err := os.UserHomeDir()
-	filePath := path.Join(home, dataDir, filename)
+	fp, err := GetFilepath(filename)
+	if err != nil {
+		return nil, err
+	}
 
-	if _, err := os.Stat(filePath); err != nil {
+	if _, err := os.Stat(fp); err != nil {
 		return nil, fmt.Errorf("file not found")
 	}
 
-	file, err := os.Open(filePath)
+	file, err := os.Open(fp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %v\n", err)
 	}
@@ -32,15 +35,12 @@ func getFileData(filename string) ([]byte, error) {
 }
 
 func overwriteFile(filename string, data []byte) error {
-	home, err := os.UserHomeDir()
-	filePath := path.Join(home, dataDir, filename)
-
-	err = os.MkdirAll(path.Dir(filePath), 0750)
+	fp, err := GetFilepath(filename)
 	if err != nil {
-		return fmt.Errorf("unable to create directory: %v", err)
+		return nil, err
 	}
 
-	err = ioutil.WriteFile(filePath, data, 0600)
+	err = ioutil.WriteFile(fp, data, 0600)
 	if err != nil {
 		return fmt.Errorf("unable to overwrite file: %v", err)
 	}
@@ -49,15 +49,12 @@ func overwriteFile(filename string, data []byte) error {
 }
 
 func appendToFile(filename string, data string) error {
-	home, err := os.UserHomeDir()
-	filePath := path.Join(home, dataDir, filename)
-
-	err = os.MkdirAll(path.Dir(filePath), 0750)
+	fp, err := GetFilepath(filename)
 	if err != nil {
-		return fmt.Errorf("unable to create directory: %v", err)
+		return nil, err
 	}
 
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	file, err := os.OpenFile(fp, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %v", err)
 	}
@@ -69,4 +66,22 @@ func appendToFile(filename string, data string) error {
 	}
 
 	return nil
+}
+
+func GetFilepath(filename string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %v", err)
+	}
+
+	fp := filepath.Join(home, dataDir, filename)
+
+	if _, err := os.Stat(fp); err != nil {
+		err = os.MkdirAll(path.Dir(fp), 0750)
+		if err != nil {
+			return nil, fmt.Errorf("unable to create directory: %v", err)
+		}
+	}
+
+	return fp, nil
 }
