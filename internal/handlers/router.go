@@ -8,10 +8,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/oorrwullie/routy/internal/logging"
 	"github.com/oorrwullie/routy/internal/models"
 
+	"github.com/gorilla/mux"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -46,7 +46,7 @@ func (r *Routy) Route() error {
 
 	list := r.buildAllowList(subs)
 
-	m := &autocert.Manager{
+	certManager := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(list),
 		Cache:      autocert.DirCache("./certs"),
@@ -102,7 +102,7 @@ func (r *Routy) Route() error {
 		Addr:    ":https",
 		Handler: router,
 		TLSConfig: &tls.Config{
-			GetCertificate: m.GetCertificate,
+			GetCertificate: certManager.GetCertificate,
 		},
 	}
 
