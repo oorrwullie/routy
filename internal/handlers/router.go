@@ -15,36 +15,36 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-type Router struct {
+type Routy struct {
 	port     string
 	hostname string
 	eventLog chan logging.EventLogMessage
 }
 
-func NewRouter(
+func NewRouty(
 	port string,
 	hostname string,
 	eventLog chan logging.EventLogMessage,
-) *Router {
-	return &Router{
+) *Routy {
+	return &Routy{
 		port:     port,
 		hostname: hostname,
 		eventLog: eventLog,
 	}
 }
 
-func (r *Router) Route() error {
+func (r *Routy) Route() error {
 	denyList, err := models.GetDenyList()
 
 	accessLog := make(chan *http.Request)
 	go logging.AccessLogger(accessLog)
 
-	routes, err := models.GetRoutes()
+	subs, err := models.GetSubdomainRoutes()
 	if err != nil {
 		return err
 	}
 
-	list := r.buildAllowList(routes)
+	list := r.buildAllowList(subs)
 
 	m := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
@@ -67,10 +67,10 @@ func (r *Router) Route() error {
 
 	router := mux.NewRouter()
 
-	for _, route := range routes {
-		targetURL, err := url.Parse(route.Target)
+	for _, s := range subs {
+		targetURL, err := url.Parse(s.Target)
 		if err != nil {
-			msg := fmt.Sprintf("failed to parse target URL for subdomain %s: %v\n", route.Subdomain, err)
+			msg := fmt.Sprintf("failed to parse target URL for subdomain %s: %v\n", s.Subdomain, err)
 			r.eventLog <- logging.EventLogMessage{
 				Level:   "ERROR",
 				Caller:  "Route()->url.Parse()",
@@ -82,18 +82,18 @@ func (r *Router) Route() error {
 
 		proxy := httputil.NewSingleHostReverseProxy(targetURL)
 
-		handler := func(w http.ResponseWriter, r *http.Request) {
-			if denyList.IsDenied(logging.GetRequestRemoteAddress(r)) {
+		handler := func(w http.ResponseWriter, req *http.Request) {
+			if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
 				return
 			}
 
-			accessLog <- r
+			accessLog <- req
 
-			r.Host = r.URL.Host
-			proxy.ServeHTTP(w, r)
+			req.Host = req.URL.Host
+			proxy.ServeHTTP(w, req)
 		}
 
-		host := fmt.Sprintf("%s.%s", route.Subdomain, r.hostname)
+		host := fmt.Sprintf("%s.%s", s.Subdomain, r.hostname)
 		subdomainRouter := router.Host(host).Subrouter()
 		subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
 	}
@@ -109,7 +109,7 @@ func (r *Router) Route() error {
 	return server.ListenAndServeTLS("", "")
 }
 
-func (r *Router) buildAllowList(subdomains []models.Route) string {
+func (r *Routy) buildAllowList(subdomains []models.SubdomainRoute) string {
 	var l []string
 	for _, s := range subdomains {
 		l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, r.hostname))

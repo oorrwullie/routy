@@ -4,17 +4,17 @@ import (
 	"encoding/json"
 )
 
-const routesFilename string = "routes.json"
+const subdomainRoutesFilename string = "subdomainRoutes.json"
 
-type Route struct {
+type SubdomainRoute struct {
 	Subdomain string `json:"subdomain"`
 	Target    string `json:"target"`
 }
 
-func GetRoutes() ([]Route, error) {
-	data := make([]Route, 0)
+func GetSubdomainRoutes() ([]SubdomainRoute, error) {
+	data := make([]SubdomainRoute, 0)
 
-	res, err := getFileData(routesFilename)
+	res, err := getFileData(subdomainRoutesFilename)
 	if err != nil {
 		if err.Error() == "file not found" {
 			return data, nil

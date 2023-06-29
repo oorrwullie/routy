@@ -49,7 +49,7 @@ func GetConfig() (*Config, error) {
 			return nil, err
 		}
 
-		err = overwriteFile(routesFilename, mb)
+		err = overwriteFile(subdomainRoutesFilename, mb)
 		if err != nil {
 			return nil, err
 		}

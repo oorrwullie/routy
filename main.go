@@ -38,7 +38,7 @@ func main() {
 		log.Fatal("could not initialize the server")
 	}
 
-	r := handlers.NewRouter(
+	r := handlers.NewRouty(
 		cfg.Port,
 		cfg.Hostname,
 		eventLog,
