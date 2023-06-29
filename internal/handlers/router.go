@@ -52,9 +52,13 @@ func (r *Routy) Route() error {
 	go func() {
 		httpServer := &http.Server{
 			Addr: ":http",
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				targetURL := "https://" + r.Host + r.URL.Path
-				http.Redirect(w, r, targetURL, http.StatusPermanentRedirect)
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
+					return nil
+				}
+
+				targetURL := "https://" + req.Host + req.URL.Path
+				http.Redirect(w, req, targetURL, http.StatusPermanentRedirect)
 			}),
 		}
 
@@ -81,7 +85,7 @@ func (r *Routy) Route() error {
 
 		handler := func(w http.ResponseWriter, req *http.Request) {
 			if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-				return
+				return nil
 			}
 
 			accessLog <- req
