@@ -37,7 +37,7 @@ func getFileData(filename string) ([]byte, error) {
 func overwriteFile(filename string, data []byte) error {
 	fp, err := GetFilepath(filename)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = ioutil.WriteFile(fp, data, 0600)
@@ -51,7 +51,7 @@ func overwriteFile(filename string, data []byte) error {
 func appendToFile(filename string, data string) error {
 	fp, err := GetFilepath(filename)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	file, err := os.OpenFile(fp, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
@@ -71,7 +71,7 @@ func appendToFile(filename string, data string) error {
 func GetFilepath(filename string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %v", err)
+		return "", fmt.Errorf("failed to get home directory: %v", err)
 	}
 
 	fp := filepath.Join(home, dataDir, filename)
@@ -79,7 +79,7 @@ func GetFilepath(filename string) (string, error) {
 	if _, err := os.Stat(fp); err != nil {
 		err = os.MkdirAll(path.Dir(fp), 0750)
 		if err != nil {
-			return nil, fmt.Errorf("unable to create directory: %v", err)
+			return "", fmt.Errorf("unable to create directory: %v", err)
 		}
 	}
 

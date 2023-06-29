@@ -44,12 +44,9 @@ func (r *Routy) Route() error {
 		return err
 	}
 
-	list := r.buildAllowList(subs)
-
-	certManager := &autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(list),
-		Cache:      autocert.DirCache("./certs"),
+	certManager, err := r.getCertManager(subs)
+	if err != nil {
+		return err
 	}
 
 	go func() {
@@ -109,11 +106,24 @@ func (r *Routy) Route() error {
 	return server.ListenAndServeTLS("", "")
 }
 
-func (r *Routy) buildAllowList(subdomains []models.SubdomainRoute) string {
+func (r *Routy) getCertManager(subdomains []models.SubdomainRoute) (*autocert.Manager, error) {
 	var l []string
 	for _, s := range subdomains {
 		l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, r.hostname))
 	}
 
-	return strings.Join(l[:], ",")
+	list := strings.Join(l[:], ",")
+
+	certDir, err := models.GetFilepath("certs")
+	if err != nil {
+		return nil, err
+	}
+
+	m := &autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(list),
+		Cache:      autocert.DirCache(certDir),
+	}
+
+	return m, nil
 }
