@@ -24,7 +24,7 @@ func NewModel() (*Model, error) {
 			return nil, fmt.Errorf("failed to get user's home directory: %s", err)
 		}
 
-		dataDir = usr.HomeDir
+		dataDir = filepath.Join(usr.HomeDir, "routy")
 	}
 
 	return &Model{DataDir: dataDir}, nil
