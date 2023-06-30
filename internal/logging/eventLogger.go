@@ -14,7 +14,12 @@ type EventLogMessage struct {
 	Message   string `json:"message"`
 }
 
-func EventLogger(logChan <-chan EventLogMessage) {
+func StartEventLogger(logChan <-chan EventLogMessage) error {
+	m, err := models.NewModel()
+	if err != nil {
+		return err
+	}
+
 	for logMsg := range logChan {
 		t := time.Now()
 		logMsg.Timestamp = t.Format("15:04:05 MST 10-02-2006")
@@ -28,6 +33,8 @@ func EventLogger(logChan <-chan EventLogMessage) {
 			logMsg.Message,
 		)
 
-		models.WriteToEventLog(entry)
+		m.WriteToEventLog(entry)
 	}
+
+	return nil
 }

@@ -17,8 +17,12 @@ type Config struct {
 func GetConfig() (*Config, error) {
 	var config Config
 
-	home, err := os.UserHomeDir()
-	filePath := path.Join(home, dataDir, configFilename)
+	m, err := NewModel()
+	if err != nil {
+		return nil, err
+	}
+
+	filePath := path.Join(m.DataDir, configFilename)
 
 	if _, err := os.Stat(filePath); err != nil {
 		fmt.Println("It looks like this is the first run. Generating config files...")
@@ -33,7 +37,7 @@ func GetConfig() (*Config, error) {
 			return nil, err
 		}
 
-		err = overwriteFile(configFilename, cb)
+		err = m.overwriteFile(configFilename, cb)
 		if err != nil {
 			return nil, err
 		}
@@ -44,12 +48,12 @@ func GetConfig() (*Config, error) {
 			return nil, err
 		}
 
-		err = overwriteFile(denyListFilename, mb)
+		err = m.overwriteFile(denyListFilename, mb)
 		if err != nil {
 			return nil, err
 		}
 
-		err = overwriteFile(subdomainRoutesFilename, mb)
+		err = m.overwriteFile(subdomainRoutesFilename, mb)
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +61,7 @@ func GetConfig() (*Config, error) {
 		return &config, nil
 	}
 
-	res, err := getFileData(configFilename)
+	res, err := m.getFileData(configFilename)
 	if err != nil {
 		return nil, err
 	}

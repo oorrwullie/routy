@@ -2,6 +2,6 @@ package models
 
 const accessLogFilename string = "access.log"
 
-func WriteToAccessLog(data string) error {
-	return appendToFile(accessLogFilename, data)
+func (m *Model) WriteToAccessLog(data string) error {
+	return m.appendToFile(accessLogFilename, data)
 }

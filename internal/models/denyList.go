@@ -11,7 +11,12 @@ type DenyList struct {
 func GetDenyList() (*DenyList, error) {
 	data := make([]string, 0)
 
-	res, err := getFileData(denyListFilename)
+	m, err := NewModel()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := m.getFileData(denyListFilename)
 	if err != nil {
 		if err.Error() == "file not found" {
 			return &DenyList{list: data}, nil

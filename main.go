@@ -13,8 +13,19 @@ import (
 )
 
 func main() {
+	cfg, err := models.GetConfig()
+	if err != nil {
+		log.Fatal("could not initialize the server")
+	}
+
 	eventLog := make(chan logging.EventLogMessage)
-	go logging.EventLogger(eventLog)
+
+	go func() {
+		err := logging.StartEventLogger(eventLog)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	shutdownChan := make(chan os.Signal, 1)
 	signal.Notify(shutdownChan, os.Interrupt, syscall.SIGTERM)
@@ -32,11 +43,6 @@ func main() {
 		time.Sleep(2 * time.Second)
 		os.Exit(0)
 	}()
-
-	cfg, err := models.GetConfig()
-	if err != nil {
-		log.Fatal("could not initialize the server")
-	}
 
 	r := handlers.NewRouty(
 		cfg.Port,

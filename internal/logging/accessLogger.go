@@ -9,7 +9,12 @@ import (
 	"github.com/oorrwullie/routy/internal/models"
 )
 
-func AccessLogger(requestChan <-chan *http.Request) {
+func StartAccessLogger(requestChan <-chan *http.Request) error {
+	m, err := models.NewModel()
+	if err != nil {
+		return err
+	}
+
 	for request := range requestChan {
 		t := time.Now()
 
@@ -22,8 +27,10 @@ func AccessLogger(requestChan <-chan *http.Request) {
 			request.Header.Get("User-Agent"),
 		)
 
-		models.WriteToAccessLog(entry)
+		m.WriteToAccessLog(entry)
 	}
+
+	return nil
 }
 
 func GetRequestRemoteAddress(r *http.Request) string {

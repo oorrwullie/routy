@@ -2,6 +2,6 @@ package models
 
 const eventLogFilename string = "events.log"
 
-func WriteToEventLog(data string) error {
-	return appendToFile(eventLogFilename, data)
+func (m *Model) WriteToEventLog(data string) error {
+	return m.appendToFile(eventLogFilename, data)
 }

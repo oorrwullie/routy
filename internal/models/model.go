@@ -4,14 +4,34 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path"
 	"path/filepath"
 )
 
-const dataDir string = "routy"
+type Model struct {
+	DataDir string
+}
 
-func getFileData(filename string) ([]byte, error) {
-	fp, err := GetFilepath(filename)
+func NewModel() (*Model, error) {
+	var dataDir string
+
+	if _, err := os.Stat("/var/routy"); err == nil {
+		dataDir = "/var/routy"
+	} else {
+		usr, err := user.Current()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user's home directory: %s", err)
+		}
+
+		dataDir = usr.HomeDir
+	}
+
+	return &Model{DataDir: dataDir}, nil
+}
+
+func (m *Model) getFileData(filename string) ([]byte, error) {
+	fp, err := m.GetFilepath(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -34,8 +54,8 @@ func getFileData(filename string) ([]byte, error) {
 	return data, nil
 }
 
-func overwriteFile(filename string, data []byte) error {
-	fp, err := GetFilepath(filename)
+func (m *Model) overwriteFile(filename string, data []byte) error {
+	fp, err := m.GetFilepath(filename)
 	if err != nil {
 		return err
 	}
@@ -48,8 +68,8 @@ func overwriteFile(filename string, data []byte) error {
 	return nil
 }
 
-func appendToFile(filename string, data string) error {
-	fp, err := GetFilepath(filename)
+func (m *Model) appendToFile(filename string, data string) error {
+	fp, err := m.GetFilepath(filename)
 	if err != nil {
 		return err
 	}
@@ -68,13 +88,8 @@ func appendToFile(filename string, data string) error {
 	return nil
 }
 
-func GetFilepath(filename string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %v", err)
-	}
-
-	fp := filepath.Join(home, dataDir, filename)
+func (m *Model) GetFilepath(filename string) (string, error) {
+	fp := filepath.Join(m.DataDir, filename)
 
 	if _, err := os.Stat(fp); err != nil {
 		err = os.MkdirAll(path.Dir(fp), 0750)

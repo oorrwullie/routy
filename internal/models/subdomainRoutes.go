@@ -14,7 +14,12 @@ type SubdomainRoute struct {
 func GetSubdomainRoutes() ([]SubdomainRoute, error) {
 	data := make([]SubdomainRoute, 0)
 
-	res, err := getFileData(subdomainRoutesFilename)
+	m, err := NewModel()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := m.getFileData(subdomainRoutesFilename)
 	if err != nil {
 		if err.Error() == "file not found" {
 			return data, nil

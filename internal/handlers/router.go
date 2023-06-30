@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -35,9 +36,17 @@ func NewRouty(
 
 func (r *Routy) Route() error {
 	denyList, err := models.GetDenyList()
+	if err != nil {
+		return err
+	}
 
 	accessLog := make(chan *http.Request)
-	go logging.AccessLogger(accessLog)
+	go func() {
+		err := logging.StartAccessLogger(accessLog)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	subs, err := models.GetSubdomainRoutes()
 	if err != nil {
@@ -54,7 +63,7 @@ func (r *Routy) Route() error {
 			Addr: ":http",
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-					return nil
+					return
 				}
 
 				targetURL := "https://" + req.Host + req.URL.Path
@@ -85,7 +94,7 @@ func (r *Routy) Route() error {
 
 		handler := func(w http.ResponseWriter, req *http.Request) {
 			if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-				return nil
+				return
 			}
 
 			accessLog <- req
@@ -118,16 +127,21 @@ func (r *Routy) getCertManager(subdomains []models.SubdomainRoute) (*autocert.Ma
 
 	list := strings.Join(l[:], ",")
 
-	certDir, err := models.GetFilepath("certs")
+	model, err := models.NewModel()
 	if err != nil {
 		return nil, err
 	}
 
-	m := &autocert.Manager{
+	certDir, err := model.GetFilepath("certs")
+	if err != nil {
+		return nil, err
+	}
+
+	manager := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(list),
 		Cache:      autocert.DirCache(certDir),
 	}
 
-	return m, nil
+	return manager, nil
 }
