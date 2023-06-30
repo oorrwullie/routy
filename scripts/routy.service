@@ -1,0 +1,15 @@
+[Unit]
+Description=Run Routy McRouteFace
+
+[Service]
+User=daemon
+Group=wheel
+WorkingDirectory=/home/ubuntu/mydaemon
+ExecStart=/usr/local/bin/routy
+Type=simple
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
