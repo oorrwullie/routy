@@ -3,7 +3,6 @@ Description=Run Routy McRouteFace
 
 [Service]
 Group=www-data
-WorkingDirectory=/home/ubuntu/mydaemon
 ExecStart=/usr/local/bin/routy
 Type=simple
 TimeoutStopSec=10
