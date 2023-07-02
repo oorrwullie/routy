@@ -31,7 +31,6 @@ ifeq ($(DISTRO),Ubuntu)
 	@rm -rf /usr/local/bin/routy
 	@rm -rf /var/routy
 	@systemctl stop routy.service
-	@systemctl clean routy.service
 	@systemctl disable routy.service
 	@rm /etc/systemd/system/routy.service
 endif
