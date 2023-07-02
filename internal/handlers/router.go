@@ -17,18 +17,15 @@ import (
 )
 
 type Routy struct {
-	port     string
 	hostname string
 	eventLog chan logging.EventLogMessage
 }
 
 func NewRouty(
-	port string,
 	hostname string,
 	eventLog chan logging.EventLogMessage,
 ) *Routy {
 	return &Routy{
-		port:     port,
 		hostname: hostname,
 		eventLog: eventLog,
 	}

@@ -10,7 +10,6 @@ import (
 const configFilename string = "cfg.json"
 
 type Config struct {
-	Port     string `json:"port"`
 	Hostname string `json:"hostname"`
 }
 
@@ -29,8 +28,6 @@ func GetConfig() (*Config, error) {
 
 		fmt.Println("Enter the domain name of the server: ")
 		fmt.Scanln(&config.Hostname)
-		fmt.Println("Enter the port the server will listen on: ")
-		fmt.Scanln(&config.Port)
 
 		cb, err := json.MarshalIndent(config, "", "    ")
 		if err != nil {

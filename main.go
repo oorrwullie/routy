@@ -45,7 +45,6 @@ func main() {
 	}()
 
 	r := handlers.NewRouty(
-		cfg.Port,
 		cfg.Hostname,
 		eventLog,
 	)
