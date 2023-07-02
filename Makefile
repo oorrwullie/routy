@@ -18,10 +18,21 @@ ifeq ($(DISTRO),Ubuntu)
 	@chgrp www-data /var/routy
 	@if [ -d /etc/systemd/system ]; then cp scripts/routy.service /etc/systemd/system ; fi
 	@systemctl enable routy.service
-	@systemctl start routy.service
 else
 	@echo $(DISTRO) "is not supported in make install."
 endif
 else
 	@echo $(OS) "is not supported in make install."
+endif
+
+clean:
+ifeq ($(OS),Linux)
+ifeq ($(DISTRO),Ubuntu)
+	@rm -rf /usr/local/bin/routy
+	@rm -rf /var/routy
+	@systemctl stop routy.service
+	@systemctl clean routy.service
+	@systemctl disable routy.service
+	@rm /etc/systemd/system/routy.service
+endif
 endif
