@@ -2,7 +2,6 @@
 Description=Run Routy McRouteFace
 
 [Service]
-User=daemon
 Group=www-data
 WorkingDirectory=/home/ubuntu/mydaemon
 ExecStart=/usr/local/bin/routy
