@@ -1,4 +1,4 @@
-#routy
+# routy
 Routy is a speedy little Edge Proxy with deny list IP blocking and SSL integration with Let's Encrypt.
 
 ## Installation
