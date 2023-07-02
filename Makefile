@@ -1,3 +1,4 @@
+all:
 OS := $(shell uname -s)
 
 ifeq ($(OS),Linux)
@@ -6,7 +7,7 @@ endif
 
 install:
 ifeq ($(OS),Linux)
-		ifeq ($(DISTRO)),Ubuntu)
+		ifeq ($(DISTRO),Ubuntu)
 				@go build -o routy
 				@iptables -A INPUT -p tcp --dport 80 -j ACCEPT
 				@iptables -A INPUT -p tcp --dport 443 -j ACCEPT
