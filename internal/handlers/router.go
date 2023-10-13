@@ -17,17 +17,17 @@ import (
 )
 
 type Routy struct {
-	hostname string
-	eventLog chan logging.EventLogMessage
+	hostnames []string
+	eventLog  chan logging.EventLogMessage
 }
 
 func NewRouty(
-	hostname string,
+	hostnames []string,
 	eventLog chan logging.EventLogMessage,
 ) *Routy {
 	return &Routy{
-		hostname: hostname,
-		eventLog: eventLog,
+		hostnames: hostnames,
+		eventLog:  eventLog,
 	}
 }
 
@@ -100,7 +100,7 @@ func (r *Routy) Route() error {
 			proxy.ServeHTTP(w, req)
 		}
 
-		host := fmt.Sprintf("%s.%s", s.Subdomain, r.hostname)
+		host := fmt.Sprintf("%s.%s", s.Subdomain, r.hostnames)
 		subdomainRouter := router.Host(host).Subrouter()
 		subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
 	}
@@ -119,7 +119,7 @@ func (r *Routy) Route() error {
 func (r *Routy) getCertManager(subdomains []models.SubdomainRoute) (*autocert.Manager, error) {
 	var l []string
 	for _, s := range subdomains {
-		l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, r.hostname))
+		l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, r.hostnames))
 	}
 
 	list := strings.Join(l[:], ",")

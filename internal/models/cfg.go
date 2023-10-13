@@ -10,7 +10,7 @@ import (
 const configFilename string = "cfg.json"
 
 type Config struct {
-	Hostname string `json:"hostname"`
+	Hostnames []string `json:"hostnames"`
 }
 
 func GetConfig() (*Config, error) {
@@ -24,10 +24,12 @@ func GetConfig() (*Config, error) {
 	filePath := path.Join(m.DataDir, configFilename)
 
 	if _, err := os.Stat(filePath); err != nil {
+		var hostname = ""
 		fmt.Println("It looks like this is the first run. Generating config files...")
 
 		fmt.Println("Enter the domain name of the server: ")
-		fmt.Scanln(&config.Hostname)
+		fmt.Scanln(&hostname)
+		config.Hostnames = append(config.Hostnames, hostname)
 
 		cb, err := json.MarshalIndent(config, "", "    ")
 		if err != nil {

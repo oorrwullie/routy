@@ -34,7 +34,10 @@ All configuration and log files are found in either `/var/routy` or `$HOME/routy
 The cfg.json file contains the configuration for the base hostname. A typical configuration looks like this:
 ```
 {
-    "hostname": "example.com"
+    "hostnames": [
+        "example.com",
+        "example2.com"
+    ]
 }
 ```
 
