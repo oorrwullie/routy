@@ -7,6 +7,7 @@ import (
 const subdomainRoutesFilename string = "subdomainRoutes.json"
 
 type SubdomainRoute struct {
+	Domain    string `json:"domain"` // Must be a domain in cfg
 	Subdomain string `json:"subdomain"`
 	Target    string `json:"target"`
 }

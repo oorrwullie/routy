@@ -100,7 +100,7 @@ func (r *Routy) Route() error {
 			proxy.ServeHTTP(w, req)
 		}
 
-		host := fmt.Sprintf("%s.%s", s.Subdomain, r.hostnames)
+		host := fmt.Sprintf("%s.%s", s.Subdomain, s.Domain)
 		subdomainRouter := router.Host(host).Subrouter()
 		subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
 	}
@@ -119,7 +119,7 @@ func (r *Routy) Route() error {
 func (r *Routy) getCertManager(subdomains []models.SubdomainRoute) (*autocert.Manager, error) {
 	var l []string
 	for _, s := range subdomains {
-		l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, r.hostnames))
+		l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, s.Domain))
 	}
 
 	list := strings.Join(l[:], ",")

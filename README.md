@@ -46,10 +46,12 @@ A typical subdomainRoutes.json file will look like this:
 ```
 [
     {
+        domain: "example.com",
         subdomain: "mysubdomain",
         target: "http://localhost:8080"
     },
     {
+        domain: "example2.com",
         subdomain: "example",
         target: "http://example.example"
     }
