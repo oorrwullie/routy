@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/oorrwullie/routy/internal/models"
 	"log"
 	"os"
 	"os/signal"
@@ -9,15 +10,9 @@ import (
 
 	"github.com/oorrwullie/routy/internal/handlers"
 	"github.com/oorrwullie/routy/internal/logging"
-	"github.com/oorrwullie/routy/internal/models"
 )
 
 func main() {
-	cfg, err := models.GetConfig()
-	if err != nil {
-		log.Fatal("could not initialize the server")
-	}
-
 	eventLog := make(chan logging.EventLogMessage)
 
 	go func() {
@@ -44,8 +39,13 @@ func main() {
 		os.Exit(0)
 	}()
 
+	hostnames, err := models.GetDomains()
+	if err != nil {
+		log.Fatal("Unable to get domains")
+	}
+
 	r := handlers.NewRouty(
-		cfg.Hostnames,
+		hostnames,
 		eventLog,
 	)
 
