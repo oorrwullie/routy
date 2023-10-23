@@ -31,31 +31,28 @@ All configuration and log files are found in either `/var/routy` or `$HOME/routy
 * subdomainRoutes.json: subdomain/target combos to proxy routes to
 
 ### cfg.json
-The cfg.json file contains the configuration for the base hostname. A typical configuration looks like this:
+The cfg.json file contains the configuration for the base hostname and subdomains. A typical configuration looks like this:
 ```
 {
-    "hostnames": [
-        "example.com",
-        "example2.com"
-    ]
-}
-```
-
-### Subdomain Routes
-A typical subdomainRoutes.json file will look like this:
-```
-[
-    {
-        domain: "example.com",
-        subdomain: "mysubdomain",
-        target: "http://localhost:8080"
-    },
-    {
-        domain: "example2.com",
-        subdomain: "example",
-        target: "http://example.example"
+    "domains": {
+        "example.com": [
+            {
+                "subdomain": "mysubdomain",
+                "target": "http://localhost:8080"
+            },
+            {
+                "subdomain": "mysubdomain2",
+                "target": "http://localhost:8081"
+            }
+        ],
+        "example2.com": [
+            {
+                subdomain: "example",
+                target: "http://example.example"
+            }
+        ]
     }
-]
+}
 ```
 
 ### Deny List

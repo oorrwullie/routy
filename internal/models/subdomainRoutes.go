@@ -2,12 +2,16 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
-const subdomainRoutesFilename string = "subdomainRoutes.json"
+const subdomainRoutesFilename string = "cfg.json"
+
+type Route struct {
+	Domains map[string][]SubdomainRoute `json:"domains"`
+}
 
 type SubdomainRoute struct {
-	Domain    string `json:"domain"` // Must be a domain in cfg
 	Subdomain string `json:"subdomain"`
 	Target    string `json:"target"`
 }
@@ -20,15 +24,17 @@ func GetDomains() ([]string, error) {
 
 	ds := make([]string, 0)
 
-	for _, d := range data {
-		ds = append(ds, d.Domain)
+	for d, sd := range data.Domains {
+		for _, s := range sd {
+			ds = append(ds, fmt.Sprintf("%s.%s", s.Subdomain, d))
+		}
 	}
 
 	return ds, nil
 }
 
-func GetSubdomainRoutes() ([]SubdomainRoute, error) {
-	data := make([]SubdomainRoute, 0)
+func GetSubdomainRoutes() (*Route, error) {
+	var data *Route = &Route{}
 
 	m, err := NewModel()
 	if err != nil {
@@ -44,7 +50,7 @@ func GetSubdomainRoutes() ([]SubdomainRoute, error) {
 		}
 	}
 
-	err = json.Unmarshal(res, &data)
+	err = json.Unmarshal(res, data)
 	if err != nil {
 		return nil, err
 	}

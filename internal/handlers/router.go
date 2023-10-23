@@ -50,7 +50,7 @@ func (r *Routy) Route() error {
 		return err
 	}
 
-	certManager, err := r.getCertManager(subs)
+	certManager, err := r.getCertManager(subs.Domains)
 	if err != nil {
 		return err
 	}
@@ -74,35 +74,38 @@ func (r *Routy) Route() error {
 
 	router := mux.NewRouter()
 
-	for _, s := range subs {
-		targetURL, err := url.Parse(s.Target)
-		if err != nil {
-			msg := fmt.Sprintf("failed to parse target URL for subdomain %s: %v\n", s.Subdomain, err)
-			r.eventLog <- logging.EventLogMessage{
-				Level:   "ERROR",
-				Caller:  "Route()->url.Parse()",
-				Message: msg,
+	for d, sd := range subs.Domains {
+		for _, s := range sd {
+
+			targetURL, err := url.Parse(s.Target)
+			if err != nil {
+				msg := fmt.Sprintf("failed to parse target URL for subdomain %s: %v\n", s.Subdomain, err)
+				r.eventLog <- logging.EventLogMessage{
+					Level:   "ERROR",
+					Caller:  "Route()->url.Parse()",
+					Message: msg,
+				}
+
+				continue
 			}
 
-			continue
-		}
+			proxy := httputil.NewSingleHostReverseProxy(targetURL)
 
-		proxy := httputil.NewSingleHostReverseProxy(targetURL)
+			handler := func(w http.ResponseWriter, req *http.Request) {
+				if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
+					return
+				}
 
-		handler := func(w http.ResponseWriter, req *http.Request) {
-			if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-				return
+				accessLog <- req
+
+				req.Host = req.URL.Host
+				proxy.ServeHTTP(w, req)
 			}
 
-			accessLog <- req
-
-			req.Host = req.URL.Host
-			proxy.ServeHTTP(w, req)
+			host := fmt.Sprintf("%s.%s", s.Subdomain, d)
+			subdomainRouter := router.Host(host).Subrouter()
+			subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
 		}
-
-		host := fmt.Sprintf("%s.%s", s.Subdomain, s.Domain)
-		subdomainRouter := router.Host(host).Subrouter()
-		subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
 	}
 
 	server := &http.Server{
@@ -116,10 +119,12 @@ func (r *Routy) Route() error {
 	return server.ListenAndServeTLS("", "")
 }
 
-func (r *Routy) getCertManager(subdomains []models.SubdomainRoute) (*autocert.Manager, error) {
+func (r *Routy) getCertManager(subdomains map[string][]models.SubdomainRoute) (*autocert.Manager, error) {
 	var l []string
-	for _, s := range subdomains {
-		l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, s.Domain))
+	for d, sd := range subdomains {
+		for _, s := range sd {
+			l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, d))
+		}
 	}
 
 	list := strings.Join(l[:], ",")
