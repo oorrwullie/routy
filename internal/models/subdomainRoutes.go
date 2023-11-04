@@ -12,8 +12,14 @@ type Route struct {
 }
 
 type SubdomainRoute struct {
-	Subdomain string `json:"subdomain"`
-	Target    string `json:"target"`
+	Subdomain  string      `json:"subdomain"`
+	Target     string      `json:"target"`
+	Websockets []Websocket `json:"websockets"`
+}
+
+type Websocket struct {
+	Path string `json:"path"`
+	Port int    `json:"port"`
 }
 
 func GetDomains() ([]string, error) {

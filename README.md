@@ -31,7 +31,7 @@ All configuration and log files are found in either `/var/routy` or `$HOME/routy
 * subdomainRoutes.json: subdomain/target combos to proxy routes to
 
 ### cfg.json
-The cfg.json file contains the configuration for the base hostname and subdomains. A typical configuration looks like this:
+The cfg.json file contains the configuration for the base hostname and subdomains. A typical configuration including a configuration for a websocket looks like this:
 ```
 {
     "domains": {
@@ -48,7 +48,13 @@ The cfg.json file contains the configuration for the base hostname and subdomain
         "example2.com": [
             {
                 subdomain: "example",
-                target: "http://example.example"
+                target: "http://example.example",
+                "websockets": [
+                    {
+                        "path": "/ws",
+                        "port": 8073
+                    }
+                ]
             }
         ]
     }
