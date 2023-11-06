@@ -32,6 +32,7 @@ All configuration and log files are found in either `/var/routy` or `$HOME/routy
 
 ### cfg.json
 The cfg.json file contains the configuration for the base hostname and subdomains. A typical configuration including a configuration for a websocket looks like this:
+The timeouts are in milliseconds. All websocket paths are `/ws` on their respective subdomains.
 ```
 {
     "domains": {
@@ -51,8 +52,9 @@ The cfg.json file contains the configuration for the base hostname and subdomain
                 target: "http://example.example",
                 "websockets": [
                     {
-                        "path": "/ws",
-                        "port": 8073
+                        "port": 8073,
+                        "timeout": 1000,
+                        "idle_timeout": 60000
                     }
                 ]
             }
