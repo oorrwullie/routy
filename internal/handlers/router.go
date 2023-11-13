@@ -106,17 +106,23 @@ func (r *Routy) Route() error {
 			subdomainRouter := router.Host(host).Subrouter()
 			subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
 		}
+
+		server := &http.Server{
+			Addr:    ":https",
+			Handler: router,
+			TLSConfig: &tls.Config{
+				GetCertificate: certManager.GetCertificate,
+			},
+		}
+
+		err := server.ListenAndServeTLS("", "")
+
+		if err != nil {
+			return err
+		}
 	}
 
-	server := &http.Server{
-		Addr:    ":https",
-		Handler: router,
-		TLSConfig: &tls.Config{
-			GetCertificate: certManager.GetCertificate,
-		},
-	}
-
-	return server.ListenAndServeTLS("", "")
+	return nil
 }
 
 func (r *Routy) getCertManager(subdomains map[string][]models.SubdomainRoute) (*autocert.Manager, error) {
