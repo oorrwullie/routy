@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/acme/autocert"
+	"golang.org/x/sync/errgroup"
 )
 
 type Routy struct {
@@ -74,6 +76,8 @@ func (r *Routy) Route() error {
 
 	router := mux.NewRouter()
 
+	g, _ := errgroup.WithContext(context.Background())
+
 	for d, sd := range subs.Domains {
 		for _, s := range sd {
 
@@ -115,14 +119,13 @@ func (r *Routy) Route() error {
 			},
 		}
 
-		err := server.ListenAndServeTLS("", "")
+		g.Go(func() error {
+			return server.ListenAndServeTLS("", "")
+		})
 
-		if err != nil {
-			return err
-		}
 	}
 
-	return nil
+	return g.Wait()
 }
 
 func (r *Routy) getCertManager(subdomains map[string][]models.SubdomainRoute) (*autocert.Manager, error) {
