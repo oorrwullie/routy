@@ -1,0 +1,17 @@
+routes:
+  domains:
+    - name: oorrwullie.com
+      target: ~
+      subdomains:
+        - name: homebridge
+          target: http://127.0.0.1:8080
+        - name: api
+          target: http://127.0.0.1:8080/api
+    - name: kk7aos.com
+      target: http://127.0.0.1:8088
+      subdomains:
+        - name: sdr
+          target: http://127.0.0.1:8071
+          isWs: true
+        - name: www
+          target: http://127.0.0.1:8089

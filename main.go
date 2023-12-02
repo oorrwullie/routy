@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/oorrwullie/routy/internal/models"
 	"log"
 	"os"
 	"os/signal"
@@ -39,13 +38,13 @@ func main() {
 		os.Exit(0)
 	}()
 
-	hostnames, err := models.GetDomains()
-	if err != nil {
-		log.Fatal("Unable to get domains")
-	}
+	// hostnames, err := models.GetDomains()
+	// if err != nil {
+	// 	log.Fatal("Unable to get domains")
+	// }
 
 	r := handlers.NewRouty(
-		hostnames,
+		// hostnames,
 		eventLog,
 	)
 
@@ -56,7 +55,7 @@ func main() {
 		Message: msg,
 	}
 
-	err = r.Route()
+	err := r.Route()
 	if err != nil {
 		eventLog <- logging.EventLogMessage{
 			Level:   "ERROR",

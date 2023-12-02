@@ -24,12 +24,10 @@ type Routy struct {
 }
 
 func NewRouty(
-	hostnames []string,
 	eventLog chan logging.EventLogMessage,
 ) *Routy {
 	return &Routy{
-		hostnames: hostnames,
-		eventLog:  eventLog,
+		eventLog: eventLog,
 	}
 }
 
@@ -39,24 +37,7 @@ func (r *Routy) Route() error {
 		return err
 	}
 
-	accessLog := make(chan *http.Request)
-	go func() {
-		err := logging.StartAccessLogger(accessLog)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	subs, err := models.GetSubdomainRoutes()
-	if err != nil {
-		return err
-	}
-
-	certManager, err := r.getCertManager(subs.Domains)
-	if err != nil {
-		return err
-	}
-
+	// listens fo any traffic on http and redirects it to https
 	go func() {
 		httpServer := &http.Server{
 			Addr: ":http",
@@ -74,16 +55,61 @@ func (r *Routy) Route() error {
 
 	}()
 
+	// listens for any traffic on ws and redirects it to wss
+	go func() {
+		httpServer := &http.Server{
+			Addr: ":ws",
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
+					return
+				}
+
+				targetURL := "wss://" + req.Host + req.URL.Path
+				http.Redirect(w, req, targetURL, http.StatusPermanentRedirect)
+			}),
+		}
+
+		httpServer.ListenAndServe()
+
+	}()
+
+	accessLog := make(chan *http.Request)
+	go func() {
+		err := logging.StartAccessLogger(accessLog)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
 	router := mux.NewRouter()
 
 	g, _ := errgroup.WithContext(context.Background())
 
-	for d, sd := range subs.Domains {
-		for _, s := range sd {
+	routes, err := models.GetDomainRoutes()
+	if err != nil {
+		return err
+	}
 
-			targetURL, err := url.Parse(s.Target)
+	for _, domain := range routes.Domains {
+		certManager, err := r.getCertManager(domain)
+		if err != nil {
+			return err
+		}
+
+		if domain.Target != "" {
+			sd := models.Subdomain{
+				Name:   domain.Name,
+				Target: domain.Target,
+			}
+
+			domain.Subdomains = append(domain.Subdomains, sd)
+		}
+
+		for _, sd := range domain.Subdomains {
+
+			targetURL, err := url.Parse(sd.Target)
 			if err != nil {
-				msg := fmt.Sprintf("failed to parse target URL for subdomain %s: %v\n", s.Subdomain, err)
+				msg := fmt.Sprintf("failed to parse target URL for subdomain %s: %v\n", sd.Name, err)
 				r.eventLog <- logging.EventLogMessage{
 					Level:   "ERROR",
 					Caller:  "Route()->url.Parse()",
@@ -106,7 +132,13 @@ func (r *Routy) Route() error {
 				proxy.ServeHTTP(w, req)
 			}
 
-			host := fmt.Sprintf("%s.%s", s.Subdomain, d)
+			var host string
+			if sd.Name == domain.Name {
+				host = domain.Name
+			} else {
+				host = fmt.Sprintf("%s.%s", sd.Name, domain.Name)
+			}
+
 			subdomainRouter := router.Host(host).Subrouter()
 			subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
 		}
@@ -128,12 +160,15 @@ func (r *Routy) Route() error {
 	return g.Wait()
 }
 
-func (r *Routy) getCertManager(subdomains map[string][]models.SubdomainRoute) (*autocert.Manager, error) {
+func (r *Routy) getCertManager(domain models.Domain) (*autocert.Manager, error) {
 	var l []string
-	for d, sd := range subdomains {
-		for _, s := range sd {
-			l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, d))
-		}
+
+	if domain.Target != "" {
+		l = append(l, domain.Name)
+	}
+
+	for _, sd := range domain.Subdomains {
+		l = append(l, fmt.Sprintf("%s.%s", sd.Name, domain.Name))
 	}
 
 	list := strings.Join(l[:], ",")
