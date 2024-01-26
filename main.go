@@ -38,13 +38,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	// hostnames, err := models.GetDomains()
-	// if err != nil {
-	// 	log.Fatal("Unable to get domains")
-	// }
-
 	r := handlers.NewRouty(
-		// hostnames,
 		eventLog,
 	)
 

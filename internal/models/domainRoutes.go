@@ -1,8 +1,6 @@
 package models
 
 import (
-	"fmt"
-
 	"gopkg.in/yaml.v2"
 )
 
@@ -48,6 +46,5 @@ func GetDomainRoutes() (*Routes, error) {
 		return nil, err
 	}
 
-	fmt.Printf("%+v\n", data)
 	return data, err
 }

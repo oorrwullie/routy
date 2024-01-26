@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -36,24 +35,6 @@ func (r *Routy) Route() error {
 	if err != nil {
 		return err
 	}
-
-	// listens fo any traffic on http and redirects it to https
-	go func() {
-		httpServer := &http.Server{
-			Addr: ":http",
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-					return
-				}
-
-				targetURL := "https://" + req.Host + req.URL.Path
-				http.Redirect(w, req, targetURL, http.StatusPermanentRedirect)
-			}),
-		}
-
-		httpServer.ListenAndServe()
-
-	}()
 
 	// listens for any traffic on ws and redirects it to wss
 	go func() {
@@ -143,12 +124,21 @@ func (r *Routy) Route() error {
 			subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
 		}
 
+		// listens fo any traffic on http and redirects it to https
+		go func() {
+			httpServer := &http.Server{
+				Addr:    ":http",
+				Handler: certManager.HTTPHandler(nil),
+			}
+
+			httpServer.ListenAndServe()
+
+		}()
+
 		server := &http.Server{
-			Addr:    ":https",
-			Handler: router,
-			TLSConfig: &tls.Config{
-				GetCertificate: certManager.GetCertificate,
-			},
+			Addr:      ":https",
+			Handler:   router,
+			TLSConfig: certManager.TLSConfig(),
 		}
 
 		g.Go(func() error {
