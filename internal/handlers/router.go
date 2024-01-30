@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
 
 	"github.com/oorrwullie/routy/internal/logging"
 	"github.com/oorrwullie/routy/internal/models"
@@ -71,12 +70,21 @@ func (r *Routy) Route() error {
 		return err
 	}
 
-	for _, domain := range routes.Domains {
-		certManager, err := r.getCertManager(domain)
-		if err != nil {
-			return err
+	for _, d := range routes.Domains {
+		if d.Target != "" {
+			r.hostnames = append(r.hostnames, d.Name)
 		}
+		for _, sd := range d.Subdomains {
+			r.hostnames = append(r.hostnames, fmt.Sprintf("%s.%s", sd.Name, d.Name))
+		}
+	}
 
+	certManager, err := r.getCertManager()
+	if err != nil {
+		return err
+	}
+
+	for _, domain := range routes.Domains {
 		if domain.Target != "" {
 			sd := models.Subdomain{
 				Name:   domain.Name,
@@ -150,19 +158,7 @@ func (r *Routy) Route() error {
 	return g.Wait()
 }
 
-func (r *Routy) getCertManager(domain models.Domain) (*autocert.Manager, error) {
-	var l []string
-
-	if domain.Target != "" {
-		l = append(l, domain.Name)
-	}
-
-	for _, sd := range domain.Subdomains {
-		l = append(l, fmt.Sprintf("%s.%s", sd.Name, domain.Name))
-	}
-
-	list := strings.Join(l[:], ",")
-
+func (r *Routy) getCertManager() (*autocert.Manager, error) {
 	model, err := models.NewModel()
 	if err != nil {
 		return nil, err
@@ -175,7 +171,7 @@ func (r *Routy) getCertManager(domain models.Domain) (*autocert.Manager, error) 
 
 	manager := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(list),
+		HostPolicy: autocert.HostWhitelist(r.hostnames...),
 		Cache:      autocert.DirCache(certDir),
 	}
 
