@@ -8,14 +8,14 @@ You should be able to simply run `sudo make install`.
 This will install the binary to `/usr/local/bin` and configure a deamon for you.
 
 #### Everyone Else
-```
+```bash
 go build . -o routy
 sudo mv routy /usr/local/bin
 sudo chgrp www-data /usr/local/bin/routy
 sudo chmod g+x /usr/local/bin/routy
 ```
 If your user does not have permission to run servers on ports 80 and 443:
-```
+```bash
 sudo @iptables -A INPUT -p tcp --dport 80 -j ACCEPT
 sudo @iptables -A INPUT -p tcp --dport 443 -j ACCEPT
 ```
@@ -50,7 +50,7 @@ domains:
 
 ### Deny List
 A typical denyList.json file will look like this:
-```
+```json
 [
     "100.15.126.231",
     "100.19.145.164",
