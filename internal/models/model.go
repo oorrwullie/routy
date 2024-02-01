@@ -2,7 +2,7 @@ package models
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/user"
 	"path"
@@ -46,7 +46,7 @@ func (m *Model) getFileData(filename string) ([]byte, error) {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %v\n", err)
 	}
@@ -60,7 +60,7 @@ func (m *Model) overwriteFile(filename string, data []byte) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(fp, data, 0600)
+	err = os.WriteFile(fp, data, 0600)
 	if err != nil {
 		return fmt.Errorf("unable to overwrite file: %v", err)
 	}

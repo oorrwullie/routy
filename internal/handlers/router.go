@@ -1,32 +1,30 @@
 package handlers
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
 
 	"github.com/oorrwullie/routy/internal/logging"
 	"github.com/oorrwullie/routy/internal/models"
 
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/acme/autocert"
+	"golang.org/x/sync/errgroup"
 )
 
 type Routy struct {
-	hostname string
-	eventLog chan logging.EventLogMessage
+	hostnames []string
+	eventLog  chan logging.EventLogMessage
 }
 
 func NewRouty(
-	hostname string,
 	eventLog chan logging.EventLogMessage,
 ) *Routy {
 	return &Routy{
-		hostname: hostname,
 		eventLog: eventLog,
 	}
 }
@@ -37,33 +35,16 @@ func (r *Routy) Route() error {
 		return err
 	}
 
-	accessLog := make(chan *http.Request)
-	go func() {
-		err := logging.StartAccessLogger(accessLog)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	subs, err := models.GetSubdomainRoutes()
-	if err != nil {
-		return err
-	}
-
-	certManager, err := r.getCertManager(subs)
-	if err != nil {
-		return err
-	}
-
+	// listens for any traffic on ws and redirects it to wss
 	go func() {
 		httpServer := &http.Server{
-			Addr: ":http",
+			Addr: ":ws",
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
 					return
 				}
 
-				targetURL := "https://" + req.Host + req.URL.Path
+				targetURL := "wss://" + req.Host + req.URL.Path
 				http.Redirect(w, req, targetURL, http.StatusPermanentRedirect)
 			}),
 		}
@@ -72,58 +53,112 @@ func (r *Routy) Route() error {
 
 	}()
 
+	accessLog := make(chan *http.Request)
+	go func() {
+		err := logging.StartAccessLogger(accessLog)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
 	router := mux.NewRouter()
 
-	for _, s := range subs {
-		targetURL, err := url.Parse(s.Target)
-		if err != nil {
-			msg := fmt.Sprintf("failed to parse target URL for subdomain %s: %v\n", s.Subdomain, err)
-			r.eventLog <- logging.EventLogMessage{
-				Level:   "ERROR",
-				Caller:  "Route()->url.Parse()",
-				Message: msg,
-			}
+	g, _ := errgroup.WithContext(context.Background())
 
-			continue
-		}
-
-		proxy := httputil.NewSingleHostReverseProxy(targetURL)
-
-		handler := func(w http.ResponseWriter, req *http.Request) {
-			if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-				return
-			}
-
-			accessLog <- req
-
-			req.Host = req.URL.Host
-			proxy.ServeHTTP(w, req)
-		}
-
-		host := fmt.Sprintf("%s.%s", s.Subdomain, r.hostname)
-		subdomainRouter := router.Host(host).Subrouter()
-		subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
+	routes, err := models.GetDomainRoutes()
+	if err != nil {
+		return err
 	}
 
-	server := &http.Server{
-		Addr:    ":https",
-		Handler: router,
-		TLSConfig: &tls.Config{
-			GetCertificate: certManager.GetCertificate,
-		},
+	for _, d := range routes.Domains {
+		if d.Target != "" {
+			r.hostnames = append(r.hostnames, d.Name)
+		}
+		for _, sd := range d.Subdomains {
+			r.hostnames = append(r.hostnames, fmt.Sprintf("%s.%s", sd.Name, d.Name))
+		}
 	}
 
-	return server.ListenAndServeTLS("", "")
+	certManager, err := r.getCertManager()
+	if err != nil {
+		return err
+	}
+
+	for _, domain := range routes.Domains {
+		if domain.Target != "" {
+			sd := models.Subdomain{
+				Name:   domain.Name,
+				Target: domain.Target,
+			}
+
+			domain.Subdomains = append(domain.Subdomains, sd)
+		}
+
+		for _, sd := range domain.Subdomains {
+
+			targetURL, err := url.Parse(sd.Target)
+			if err != nil {
+				msg := fmt.Sprintf("failed to parse target URL for subdomain %s: %v\n", sd.Name, err)
+				r.eventLog <- logging.EventLogMessage{
+					Level:   "ERROR",
+					Caller:  "Route()->url.Parse()",
+					Message: msg,
+				}
+
+				continue
+			}
+
+			proxy := httputil.NewSingleHostReverseProxy(targetURL)
+
+			handler := func(w http.ResponseWriter, req *http.Request) {
+				if denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
+					return
+				}
+
+				accessLog <- req
+
+				req.Host = req.URL.Host
+				proxy.ServeHTTP(w, req)
+			}
+
+			var host string
+			if sd.Name == domain.Name {
+				host = domain.Name
+			} else {
+				host = fmt.Sprintf("%s.%s", sd.Name, domain.Name)
+			}
+
+			subdomainRouter := router.Host(host).Subrouter()
+			subdomainRouter.PathPrefix("/").Handler(http.HandlerFunc(handler))
+		}
+
+		// listens fo any traffic on http and redirects it to https
+		go func() {
+			httpServer := &http.Server{
+				Addr:    ":http",
+				Handler: certManager.HTTPHandler(nil),
+			}
+
+			httpServer.ListenAndServe()
+
+		}()
+
+		server := &http.Server{
+			Addr:      ":https",
+			Handler:   router,
+			TLSConfig: certManager.TLSConfig(),
+		}
+
+		g.Go(func() error {
+			return server.ListenAndServeTLS("", "")
+		})
+
+	}
+
+	return g.Wait()
 }
 
-func (r *Routy) getCertManager(subdomains []models.SubdomainRoute) (*autocert.Manager, error) {
-	var l []string
-	for _, s := range subdomains {
-		l = append(l, fmt.Sprintf("%s.%s", s.Subdomain, r.hostname))
-	}
-
-	list := strings.Join(l[:], ",")
-
+func (r *Routy) getCertManager() (*autocert.Manager, error) {
 	model, err := models.NewModel()
 	if err != nil {
 		return nil, err
@@ -136,7 +171,7 @@ func (r *Routy) getCertManager(subdomains []models.SubdomainRoute) (*autocert.Ma
 
 	manager := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(list),
+		HostPolicy: autocert.HostWhitelist(r.hostnames...),
 		Cache:      autocert.DirCache(certDir),
 	}
 

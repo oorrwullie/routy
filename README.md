@@ -25,32 +25,27 @@ NOTE: If you already have wildcard SSL certificates from Let's Encrypt, copy the
 All configuration and log files are found in either `/var/routy` or `$HOME/routy`.
 * access.log:           The log file for all incoming requests
 * certs:                Directory containing the Let's Encrypt certificates
-* cfg.json:             basic configuration file for Routy
+* cfg.yaml:             Basic configuration file for Routy
 * denyList.json:        list of IP addresses to deny access to routes
 * events.log:           The log file for all server events and information
-* subdomainRoutes.json: subdomain/target combos to proxy routes to
 
-### cfg.json
-The cfg.json file contains the configuration for the base hostname. A typical configuration looks like this:
-```
-{
-    "hostname": "example.com"
-}
-```
-
-### Subdomain Routes
-A typical subdomainRoutes.json file will look like this:
-```
-[
-    {
-        subdomain: "mysubdomain",
-        target: "http://localhost:8080"
-    },
-    {
-        subdomain: "example",
-        target: "http://example.example"
-    }
-]
+### cfg.yaml
+The cfg.yaml file contains the configuration for the base hostname and subdomains. A typical configuration including a configuration for a websocket looks like this:
+The timeouts are in milliseconds. All websocket paths are `/ws` on their respective subdomains.
+```yaml
+domains:
+  - name: example.com
+    target: ~
+    subdomains:
+      - name: foo
+        target: http://127.0.0.1:8080
+  - name: anotherexample.com
+    target: http://127.0.0.2:3000
+    subdomains:
+      - name: flip
+        target: http://192.168.0.2
+      - name: flop
+        target: https://192.168.0.6:8443
 ```
 
 ### Deny List
