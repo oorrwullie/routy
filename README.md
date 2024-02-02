@@ -39,6 +39,11 @@ domains:
     subdomains:
       - name: foo
         target: http://127.0.0.1:8080
+        websockets:
+            8073:
+                port: 8073
+                timeout: 1000
+                idle-timeout: 60000
   - name: anotherexample.com
     target: http://127.0.0.2:3000
     subdomains:
