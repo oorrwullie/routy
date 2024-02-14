@@ -35,17 +35,17 @@ The timeouts are in milliseconds. All websocket paths are `/ws` on their respect
 ```yaml
 domains:
   - name: example.com
-    target: ~
     subdomains:
       - name: foo
-        target: http://127.0.0.1:8080
-        websockets:
-            8073:
-                target-port: 8073
-                timeout: 1000
-                idle-timeout: 60000
+        target: http://127.0.0.1
+        paths:
+          - location: /ws
+            upgrade: true
+            port: 1234
+            target-port: 1234
+            timeout: 1000
+            idle-timeout: 60000
   - name: anotherexample.com
-    target: http://127.0.0.2:3000
     subdomains:
       - name: flip
         target: http://192.168.0.2

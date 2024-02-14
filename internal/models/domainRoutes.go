@@ -18,9 +18,18 @@ type (
 	}
 
 	Subdomain struct {
-		Name   string `yaml:"name"`
-		Target string `yaml:"target"`
-		Wss    bool   `yaml:"wss"`
+		Name   string      `yaml:"name"`
+		Target string      `yaml:"target"`
+		Paths  []WebSocket `yaml:"paths,omitempty"`
+	}
+
+	WebSocket struct {
+		Location    string `yaml:"location"`
+		Upgrade     bool   `yaml:"upgrade"`
+		Port        int    `yaml:"port"`
+		TargetPort  int    `yaml:"target-port"`
+		Timeout     int    `yaml:"timeout,omitempty"`
+		IdleTimeout int    `yaml:"idle-timeout,omitempty"`
 	}
 )
 
