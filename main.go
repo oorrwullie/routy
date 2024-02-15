@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/oorrwullie/routy/internal/handlers"
 	"github.com/oorrwullie/routy/internal/logging"
+	"github.com/oorrwullie/routy/internal/models"
 )
 
 func main() {
@@ -20,6 +22,20 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
+
+	accessLog := make(chan *http.Request)
+
+	go func() {
+		err := logging.StartAccessLogger(accessLog)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	denyList, err := models.GetDenyList()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	shutdownChan := make(chan os.Signal, 1)
 	signal.Notify(shutdownChan, os.Interrupt, syscall.SIGTERM)
@@ -40,6 +56,8 @@ func main() {
 
 	r := handlers.NewRouty(
 		eventLog,
+		accessLog,
+		denyList,
 	)
 
 	msg := "Application is running..."
@@ -49,7 +67,7 @@ func main() {
 		Message: msg,
 	}
 
-	err := r.Route()
+	err = r.Route()
 	if err != nil {
 		eventLog <- logging.EventLogMessage{
 			Level:   "ERROR",
