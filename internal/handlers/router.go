@@ -26,7 +26,7 @@ type Routy struct {
 	denyList  *models.DenyList
 }
 
-func NewRouty(eventLog chan logging.EventLogMessage accessLog chan *http.Request, denyList *models.DenyList) *Routy {
+func NewRouty(eventLog chan logging.EventLogMessage, accessLog chan *http.Request, denyList *models.DenyList) *Routy {
 	return &Routy{
 		eventLog:  eventLog,
 		accessLog: accessLog,
