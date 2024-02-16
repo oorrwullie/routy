@@ -98,7 +98,7 @@ func (r *Routy) Route() error {
 							}
 							defer conn.Close()
 
-							targetWs, _, err := websocket.DefaultDialer.Dial(targetURL, nil)
+							targetWs, _, err := websocket.DefaultDialer.Dial(path.Target, nil)
 							if err != nil {
 								log.Printf("Error connecting to target server: %v", err)
 								return
