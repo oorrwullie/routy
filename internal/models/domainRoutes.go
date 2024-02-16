@@ -23,9 +23,10 @@ type (
 	}
 
 	Path struct {
-		Location string `yaml:"location"`
-		Upgrade  bool   `yaml:"upgrade"`
-		Target   string `yaml:"target"`
+		Location   string `yaml:"location"`
+		Upgrade    bool   `yaml:"upgrade"`
+		Target     string `yaml:"target"`
+		ListenPort int    `yaml:"listenPort,omitempty"`
 	}
 )
 

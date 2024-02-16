@@ -173,6 +173,18 @@ func (r *Routy) Route() error {
 					if path.Upgrade {
 						// if the path is an upgrade path, it's a websocket path.
 						subdomainRouter.PathPrefix(path.Location).Handler(http.HandlerFunc(websocketHandler))
+
+						if path.ListenPort != 0 {
+							server := &http.Server{
+								Addr:      fmt.Sprintf(":%d", path.ListenPort),
+								Handler:   subdomainRouter,
+								TLSConfig: certManager.TLSConfig(),
+							}
+
+							g.Go(func() error {
+								return server.ListenAndServeTLS("", "")
+							})
+						}
 					} else {
 						subdomainRouter.PathPrefix(path.Location).Handler(http.HandlerFunc(subdomainHandler))
 					}

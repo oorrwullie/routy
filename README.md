@@ -48,6 +48,7 @@ domains:
           - location: /ws
             upgrade: true
             target: http://127.0.0.1:1234
+            listenPort: 1234
   - name: anotherexample.com
     subdomains:
       - name: flip
