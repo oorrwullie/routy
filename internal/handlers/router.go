@@ -85,6 +85,83 @@ func (r *Routy) Route() error {
 
 					proxy := httputil.NewSingleHostReverseProxy(targetURL)
 
+					websocketHandler := func(w http.ResponseWriter, req *http.Request) {
+						backendURL := *targetURL
+						backendURL.Scheme = "wss"
+
+						backendConn, err := tls.Dial("tcp", backendURL.Host, &tls.Config{InsecureSkipVerify: true})
+						if err != nil {
+							msg := fmt.Sprintf("failed to connect to WebSocket backend: %v\n", err)
+							r.eventLog <- logging.EventLogMessage{
+								Level:   "ERROR",
+								Caller:  "WebsocketHandler()->tls.Dial()",
+								Message: msg,
+							}
+
+							return
+						}
+						defer backendConn.Close()
+
+						hj, ok := w.(http.Hijacker)
+						if !ok {
+							http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+							return
+						}
+
+						clientConn, _, err := hj.Hijack()
+						if err != nil {
+							msg := fmt.Sprintf("failed to hijack connection: %v\n", err)
+							r.eventLog <- logging.EventLogMessage{
+								Level:   "ERROR",
+								Caller:  "WebsocketHandler()->hj.Hijack()",
+								Message: msg,
+							}
+
+							return
+						}
+						defer clientConn.Close()
+
+						backendConn.Write([]byte(req.Method + " " + req.URL.RequestURI() + " HTTP/1.1\r\n"))
+						req.Header.WriteSubset(backendConn, map[string]bool{"Host": true, "Sec-WebSocket-Key": true, "Sec-WebSocket-Version": true})
+
+						resp, err := http.ReadResponse(bufio.NewReader(backendConn), req)
+						if err != nil {
+							msg := fmt.Sprintf("failed to read WebSocket handshake response: %v\n", err)
+							r.eventLog <- logging.EventLogMessage{
+								Level:   "ERROR",
+								Caller:  "WebsocketHandler()->http.ReadResponse()",
+								Message: msg,
+							}
+
+							return
+						}
+						resp.Header.Del("Sec-WebSocket-Key") // Security measure
+						resp.Header.Del("Sec-WebSocket-Accept")
+						resp.Write(clientConn)
+
+						go func() {
+							copyWebSocket(clientConn, backendConn)
+						}()
+
+						copyWebSocket(backendConn, clientConn)
+					}
+
+					subdomainHandler := func(w http.ResponseWriter, req *http.Request) {
+						if r.denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
+							return
+						}
+
+						if isWebSocketRequest(req) {
+							websocketHandler(w, req)
+							return
+						}
+
+						r.accessLog <- req
+
+						req.Host = req.URL.Host
+						proxy.ServeHTTP(w, req)
+					}
+
 					var host string
 					if sd.Name == domain.Name {
 						host = domain.Name
@@ -95,9 +172,9 @@ func (r *Routy) Route() error {
 					subdomainRouter := router.Host(host).Subrouter()
 					if path.Upgrade {
 						// if the path is an upgrade path, it's a websocket path.
-						subdomainRouter.PathPrefix(path.Location).Handler(http.HandlerFunc(r.WebsocketHandler(w, req, targetURL)))
+						subdomainRouter.PathPrefix(path.Location).Handler(http.HandlerFunc(websocketHandler))
 					} else {
-						subdomainRouter.PathPrefix(path.Location).Handler(http.HandlerFunc(r.SubDomainHandler(targetURL, proxy, w, req)))
+						subdomainRouter.PathPrefix(path.Location).Handler(http.HandlerFunc(subdomainHandler))
 					}
 				}
 			}
@@ -146,83 +223,6 @@ func (r *Routy) getCertManager() (*autocert.Manager, error) {
 	}
 
 	return manager, nil
-}
-
-func (r *Routy) SubDomainHandler(targetURL *url.URL, proxy *httputil.ReverseProxy, w http.ResponseWriter, req *http.Request) {
-	if r.denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-		return
-	}
-
-	if isWebSocketRequest(req) {
-		r.WebsocketHandler(w, req, targetURL)
-		return
-	}
-
-	r.accessLog <- req
-
-	req.Host = req.URL.Host
-	proxy.ServeHTTP(w, req)
-}
-
-func (r *Routy) WebsocketHandler(w http.ResponseWriter, req *http.Request, targetURL *url.URL) {
-	backendURL := *targetURL
-	backendURL.Scheme = "wss"
-
-	backendConn, err := tls.Dial("tcp", backendURL.Host, &tls.Config{InsecureSkipVerify: true})
-	if err != nil {
-		msg := fmt.Sprintf("failed to connect to WebSocket backend: %v\n", err)
-		r.eventLog <- logging.EventLogMessage{
-			Level:   "ERROR",
-			Caller:  "WebsocketHandler()->tls.Dial()",
-			Message: msg,
-		}
-
-		return
-	}
-	defer backendConn.Close()
-
-	hj, ok := w.(http.Hijacker)
-	if !ok {
-		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
-		return
-	}
-
-	clientConn, _, err := hj.Hijack()
-	if err != nil {
-		msg := fmt.Sprintf("failed to hijack connection: %v\n", err)
-		r.eventLog <- logging.EventLogMessage{
-			Level:   "ERROR",
-			Caller:  "WebsocketHandler()->hj.Hijack()",
-			Message: msg,
-		}
-
-		return
-	}
-	defer clientConn.Close()
-
-	backendConn.Write([]byte(req.Method + " " + req.URL.RequestURI() + " HTTP/1.1\r\n"))
-	req.Header.WriteSubset(backendConn, map[string]bool{"Host": true, "Sec-WebSocket-Key": true, "Sec-WebSocket-Version": true})
-
-	resp, err := http.ReadResponse(bufio.NewReader(backendConn), req)
-	if err != nil {
-		msg := fmt.Sprintf("failed to read WebSocket handshake response: %v\n", err)
-		r.eventLog <- logging.EventLogMessage{
-			Level:   "ERROR",
-			Caller:  "WebsocketHandler()->http.ReadResponse()",
-			Message: msg,
-		}
-
-		return
-	}
-	resp.Header.Del("Sec-WebSocket-Key") // Security measure
-	resp.Header.Del("Sec-WebSocket-Accept")
-	resp.Write(clientConn)
-
-	go func() {
-		copyWebSocket(clientConn, backendConn)
-	}()
-
-	copyWebSocket(backendConn, clientConn)
 }
 
 // Check if the request is a WebSocket upgrade request
