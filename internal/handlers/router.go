@@ -94,6 +94,12 @@ func (r *Routy) Route() error {
 						},
 					}
 
+					proxy.Director = func(req *http.Request) {
+						req.Host = targetURL.Host
+						req.URL.Host = targetURL.Host
+						req.URL.Scheme = targetURL.Scheme
+					}
+
 					// proxy = httputil.NewSingleHostReverseProxy(targetURL)
 					// proxy.Transport = &preserveHeadersTransport{targetURL: targetURL}
 
