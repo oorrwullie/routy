@@ -88,6 +88,7 @@ func (r *Routy) Route() error {
 					}
 
 					proxy := httputil.NewSingleHostReverseProxy(targetURL)
+					proxy.Transport = &preserveHeadersTransport{targetURL: targetURL}
 
 					if path.Upgrade {
 						http.HandleFunc(path.Location, func(w http.ResponseWriter, req *http.Request) {
@@ -97,12 +98,6 @@ func (r *Routy) Route() error {
 
 							r.accessLog <- req
 
-							req.Header.Set("X-Forwarded-Host", req.Header.Get(req.Host))
-							req.Header.Set("X-Forwarded-Proto", req.Header.Get(req.Proto))
-							req.Header.Set("X-Forwarded-For", req.Header.Get(req.RemoteAddr))
-							req.Header.Set("X-Forwarded-Port", req.Header.Get(req.URL.Port()))
-							req.Header.Set("X-Forwarded-Server", req.Header.Get(req.Host))
-
 							conn, err := upgrader.Upgrade(w, req, nil)
 							if err != nil {
 								log.Printf("Error upgrading connection to WebSocket: %v", err)
@@ -110,7 +105,7 @@ func (r *Routy) Route() error {
 							}
 							defer conn.Close()
 
-							targetWs, _, err := websocket.DefaultDialer.Dial(path.Target, nil)
+							targetWs, _, err := websocket.DefaultDialer.Dial(path.Target, req.Header)
 							if err != nil {
 								log.Printf("Error connecting to target server: %v", err)
 								return
@@ -190,11 +185,6 @@ func (r *Routy) Route() error {
 							r.accessLog <- req
 
 							req.Host = req.URL.Host
-							req.Header.Set("X-Forwarded-Host", req.Header.Get(req.Host))
-							req.Header.Set("X-Forwarded-Proto", req.Header.Get(req.Proto))
-							req.Header.Set("X-Forwarded-For", req.Header.Get(req.RemoteAddr))
-							req.Header.Set("X-Forwarded-Port", req.Header.Get(req.URL.Port()))
-							req.Header.Set("X-Forwarded-Server", req.Header.Get(req.Host))
 
 							proxy.ServeHTTP(w, req)
 						}
@@ -256,4 +246,30 @@ func (r *Routy) getCertManager() (*autocert.Manager, error) {
 	}
 
 	return manager, nil
+}
+
+type preserveHeadersTransport struct {
+	http.Transport
+	targetURL *url.URL
+}
+
+func (t *preserveHeadersTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Clone the request to avoid modifying the original
+	reqCopy := req.Clone(req.Context())
+
+	// Set the Host header of the cloned request to match the target server
+	reqCopy.Host = t.targetURL.Host
+
+	// Make the actual request
+	resp, err := t.Transport.RoundTrip(reqCopy)
+	if err != nil {
+		return nil, err
+	}
+
+	// Copy the headers from the response to the original request
+	for key, values := range resp.Header {
+		req.Header[key] = values
+	}
+
+	return resp, nil
 }
