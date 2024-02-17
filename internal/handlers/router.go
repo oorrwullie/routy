@@ -100,7 +100,7 @@ func (r *Routy) Route() error {
 							req.Header.Set("X-Forwarded-Host", req.Header.Get(req.Host))
 							req.Header.Set("X-Forwarded-Proto", req.Header.Get(req.Proto))
 							req.Header.Set("X-Forwarded-For", req.Header.Get(req.RemoteAddr))
-							req.Header.Set("X-Forwarded-Port", req.Header.Get(req.URL.Port())
+							req.Header.Set("X-Forwarded-Port", req.Header.Get(req.URL.Port()))
 							req.Header.Set("X-Forwarded-Server", req.Header.Get(req.Host))
 
 							conn, err := upgrader.Upgrade(w, req, nil)
@@ -193,7 +193,7 @@ func (r *Routy) Route() error {
 							req.Header.Set("X-Forwarded-Host", req.Header.Get(req.Host))
 							req.Header.Set("X-Forwarded-Proto", req.Header.Get(req.Proto))
 							req.Header.Set("X-Forwarded-For", req.Header.Get(req.RemoteAddr))
-							req.Header.Set("X-Forwarded-Port", req.Header.Get(req.URL.Port())
+							req.Header.Set("X-Forwarded-Port", req.Header.Get(req.URL.Port()))
 							req.Header.Set("X-Forwarded-Server", req.Header.Get(req.Host))
 
 							proxy.ServeHTTP(w, req)
