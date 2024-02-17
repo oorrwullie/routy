@@ -87,8 +87,15 @@ func (r *Routy) Route() error {
 						continue
 					}
 
-					proxy := httputil.NewSingleHostReverseProxy(targetURL)
-					proxy.Transport = &preserveHeadersTransport{targetURL: targetURL}
+					proxy := &httputil.ReverseProxy{
+						Rewrite: func(r *httputil.ProxyRequest) {
+							r.SetURL(targetURL)
+							r.Out.Host = r.In.Host
+						},
+					}
+
+					// proxy = httputil.NewSingleHostReverseProxy(targetURL)
+					// proxy.Transport = &preserveHeadersTransport{targetURL: targetURL}
 
 					if path.Upgrade {
 						http.HandleFunc(path.Location, func(w http.ResponseWriter, req *http.Request) {
@@ -184,7 +191,7 @@ func (r *Routy) Route() error {
 
 							r.accessLog <- req
 
-							req.Host = req.URL.Host
+							// req.Host = req.URL.Host
 
 							proxy.ServeHTTP(w, req)
 						}
