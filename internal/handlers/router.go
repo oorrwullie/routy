@@ -191,7 +191,11 @@ func (r *Routy) Route() error {
 
 							r.accessLog <- req
 
-							// req.Host = req.URL.Host
+							req.Host = req.URL.Host
+							req.Header.Set("X-Forwarded", "true")
+							req.Header.Set("X-Forwarded-For", req.RemoteAddr)
+							req.Header.Set("X-Forwarded-Host", req.Host)
+							req.Header.Set("X-Forwarded-Proto", req.URL.Scheme)
 
 							proxy.ServeHTTP(w, req)
 						}
