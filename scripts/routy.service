@@ -1,5 +1,5 @@
 [Unit]
-Description=Run Routy McRouteFace
+Description=Routy McRouteFace
 
 [Service]
 Group=www-data

@@ -1,5 +1,5 @@
-# routy
-Routy is a speedy little Edge Proxy with deny list IP blocking and SSL integration with Let's Encrypt.
+# Routy McRouteFace
+Routy McRouteFace is a speedy little Edge Proxy with deny list IP blocking and SSL integration with Let's Encrypt.
 
 ## Installation
 #### Ubuntu
@@ -35,22 +35,32 @@ The timeouts are in milliseconds. All websocket paths are `/ws` on their respect
 ```yaml
 domains:
   - name: example.com
+    paths:
+      - location: /
+        target: http://127.0.0.2
+        upgrade: false
     subdomains:
       - name: foo
-        target: http://127.0.0.1
         paths:
+          - location: /
+            upgrade: false
+            target: http://127.0.0.1
           - location: /ws
             upgrade: true
-            port: 1234
-            target-port: 1234
-            timeout: 1000
-            idle-timeout: 60000
+            target: http://127.0.0.1:1234
+            listenPort: 1234
   - name: anotherexample.com
     subdomains:
       - name: flip
-        target: http://192.168.0.2
+        paths:
+          - location: /
+            upgrade: false
+            target: http://192.168.0.2
       - name: flop
-        target: https://192.168.0.6:8443
+        paths:
+          - location: /
+            upgrade: false
+            target: https://192.168.0.6:8443
 ```
 
 ### Deny List
