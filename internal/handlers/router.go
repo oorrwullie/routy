@@ -3,7 +3,9 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/miekg/dns"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -283,4 +285,51 @@ func (t *preserveHeadersTransport) RoundTrip(req *http.Request) (*http.Response,
 	}
 
 	return resp, nil
+}
+
+func resolve(domain string, qtype uint16, routes *models.Routes) []dns.RR {
+	answers := make([]dns.RR, 0)
+	m := new(dns.Msg)
+	m.SetQuestion(dns.Fqdn(domain), qtype)
+	m.RecursionDesired = true
+
+	for _, dm := range routes.Domains {
+		name := dm.Name
+		d := dns.A{}
+
+		for _, s := range dm.Subdomains {
+			subName := fmt.Sprintf("%s.%s", s.Name, name)
+			d.Hdr = dns.RR_Header{
+				Name:     fmt.Sprintf("%s.", subName),
+				Rrtype:   dns.TypeA,
+				Class:    dns.ClassINET,
+				Ttl:      4,
+				Rdlength: 4,
+			}
+			for _, p := range s.Paths {
+				url, _ := url.Parse(p.Target)
+				fmt.Println(url)
+				parsedIP := net.ParseIP(url.Hostname())
+				d.A = parsedIP
+				answers = append(answers, &d)
+			}
+		}
+	}
+
+	if len(answers) > 0 {
+		return answers
+	}
+
+	c := new(dns.Client)
+	in, _, err := c.Exchange(m, "8.8.8.8:53")
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+
+	for _, ans := range in.Answer {
+		answers = append(answers, ans)
+	}
+
+	return answers
 }
