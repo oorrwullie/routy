@@ -21,12 +21,12 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func (r *Routy) HttpRouter(domains []models.Domain) error {
+func (r *Routy) HttpRouter(routes models.Http) error {
 	router := mux.NewRouter()
 
 	g, _ := errgroup.WithContext(context.Background())
 
-	for _, d := range domains {
+	for _, d := range routes.Domains {
 		if len(d.Paths) != 0 {
 			r.hostnames = append(r.hostnames, d.Name)
 		}
@@ -40,7 +40,7 @@ func (r *Routy) HttpRouter(domains []models.Domain) error {
 		return err
 	}
 
-	for _, domain := range domains {
+	for _, domain := range routes.Domains {
 		if len(domain.Paths) != 0 {
 			sd := models.Subdomain{
 				Name:  domain.Name,

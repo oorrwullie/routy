@@ -32,5 +32,5 @@ func (r *Routy) Route() error {
 		go r.sshRouter(routes.Ssh.ListenPort, routes.Ssh.Configs)
 	}
 
-	return r.HttpRouter(routes.Http.Domains)
+	return r.HttpRouter(routes.Http)
 }

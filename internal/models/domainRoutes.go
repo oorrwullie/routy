@@ -35,9 +35,9 @@ type (
 	}
 
 	Ssh struct {
-		Configs    []SshConfig
-		Enabled    bool
-		ListenPort int
+		Configs    []SshConfig `yaml:"configs"`
+		Enabled    bool        `yaml:"enabled"`
+		ListenPort int         `yaml:"listenPort"`
 	}
 
 	SshConfig struct {
