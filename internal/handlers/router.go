@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -13,15 +13,15 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/sync/errgroup"
 )
 
 type Routy struct {
-	hostnames []string
-	eventLog  chan logging.EventLogMessage
 	accessLog chan *http.Request
 	denyList  *models.DenyList
+	EventLog  chan logging.EventLogMessage
+	hostnames []string
+	routes    *models.Routes
 }
 
 var upgrader = websocket.Upgrader{
@@ -30,12 +30,41 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func NewRouty(eventLog chan logging.EventLogMessage, accessLog chan *http.Request, denyList *models.DenyList) *Routy {
+func NewRouty() (*Routy, error) {
+	routes, err := models.GetDomainRoutes()
+	if err != nil {
+		return nil, err
+	}
+
+	denyList, err := models.GetDenyList()
+	if err != nil {
+		return nil, err
+	}
+
+	accessLog := make(chan *http.Request)
+
+	go func() {
+		err := logging.StartAccessLogger(accessLog)
+		if err != nil {
+			return
+		}
+	}()
+
+	eventLog := make(chan logging.EventLogMessage)
+
+	go func() {
+		err := logging.StartEventLogger(eventLog)
+		if err != nil {
+			return
+		}
+	}()
+
 	return &Routy{
-		eventLog:  eventLog,
+		EventLog:  eventLog,
 		accessLog: accessLog,
 		denyList:  denyList,
-	}
+		routes:    routes,
+	}, nil
 }
 
 func (r *Routy) Route() error {
@@ -43,12 +72,7 @@ func (r *Routy) Route() error {
 
 	g, _ := errgroup.WithContext(context.Background())
 
-	routes, err := models.GetDomainRoutes()
-	if err != nil {
-		return err
-	}
-
-	for _, d := range routes.Domains {
+	for _, d := range r.routes.Domains {
 		if len(d.Paths) != 0 {
 			r.hostnames = append(r.hostnames, d.Name)
 		}
@@ -62,7 +86,10 @@ func (r *Routy) Route() error {
 		return err
 	}
 
-	for _, domain := range routes.Domains {
+	resolver := r.getDnsResolver()
+	net.DefaultResolver = resolver
+
+	for _, domain := range r.routes.Domains {
 		if len(domain.Paths) != 0 {
 			sd := models.Subdomain{
 				Name:  domain.Name,
@@ -78,7 +105,7 @@ func (r *Routy) Route() error {
 					targetURL, err := url.Parse(path.Target)
 					if err != nil {
 						msg := fmt.Sprintf("failed to parse target URL for subdomain %s path %s: %v\n", sd.Name, path.Location, err)
-						r.eventLog <- logging.EventLogMessage{
+						r.EventLog <- logging.EventLogMessage{
 							Level:   "ERROR",
 							Caller:  "Route()->url.Parse()",
 							Message: msg,
@@ -104,14 +131,26 @@ func (r *Routy) Route() error {
 
 							conn, err := upgrader.Upgrade(w, req, nil)
 							if err != nil {
-								log.Printf("Error upgrading connection to WebSocket: %v", err)
+								msg := fmt.Sprintf("Error upgrading connection to WebSocket: %v", err)
+								r.EventLog <- logging.EventLogMessage{
+									Level:   "ERROR",
+									Caller:  "handleWebSocket()->upgrader.Upgrade()",
+									Message: msg,
+								}
+
 								return
 							}
 							defer conn.Close()
 
 							targetWs, _, err := websocket.DefaultDialer.Dial(path.Target, req.Header)
 							if err != nil {
-								log.Printf("Error connecting to target server: %v", err)
+								msg := fmt.Sprintf("Error connecting to target server: %v", err)
+								r.EventLog <- logging.EventLogMessage{
+									Level:   "ERROR",
+									Caller:  "handleWebSocket()->websocket.DefaultDialer.Dial()",
+									Message: msg,
+								}
+
 								return
 							}
 							defer targetWs.Close()
@@ -125,7 +164,7 @@ func (r *Routy) Route() error {
 									_, message, err := conn.ReadMessage()
 									if err != nil {
 										msg := fmt.Sprintf("Error receiving message from client: %v", err)
-										r.eventLog <- logging.EventLogMessage{
+										r.EventLog <- logging.EventLogMessage{
 											Level:   "ERROR",
 											Caller:  "handleWebSocket()->conn.ReadMessage()",
 											Message: msg,
@@ -137,7 +176,7 @@ func (r *Routy) Route() error {
 									err = targetWs.WriteMessage(websocket.TextMessage, message)
 									if err != nil {
 										msg := fmt.Sprintf("Error sending message to target server: %v", err)
-										r.eventLog <- logging.EventLogMessage{
+										r.EventLog <- logging.EventLogMessage{
 											Level:   "ERROR",
 											Caller:  "handleWebSocket()->targetWs.WriteMessage()",
 											Message: msg,
@@ -152,7 +191,7 @@ func (r *Routy) Route() error {
 								_, message, err := targetWs.ReadMessage()
 								if err != nil {
 									msg := fmt.Sprintf("Error receiving message from target server: %v", err)
-									r.eventLog <- logging.EventLogMessage{
+									r.EventLog <- logging.EventLogMessage{
 										Level:   "ERROR",
 										Caller:  "handleWebSocket()->targetWs.ReadMessage()",
 										Message: msg,
@@ -164,7 +203,7 @@ func (r *Routy) Route() error {
 								err = conn.WriteMessage(websocket.TextMessage, message)
 								if err != nil {
 									msg := fmt.Sprintf("Error sending message to client: %v", err)
-									r.eventLog <- logging.EventLogMessage{
+									r.EventLog <- logging.EventLogMessage{
 										Level:   "ERROR",
 										Caller:  "handleWebSocket()->conn.WriteMessage()",
 										Message: msg,
@@ -176,9 +215,9 @@ func (r *Routy) Route() error {
 
 						})
 
-						go func() {
+						go func(path models.Path) {
 							http.ListenAndServe(fmt.Sprintf(":%d", path.ListenPort), nil)
-						}()
+						}(path)
 					} else {
 						var host string
 
@@ -204,6 +243,7 @@ func (r *Routy) Route() error {
 								req.Header.Set("X-Forwarded-Proto", targetURL.Scheme)
 
 								proxy.Rewrite = func(r *httputil.ProxyRequest) {
+									r.Out.Header["X-Forwarded"] = r.In.Header["X-Forwarded"]
 									r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
 									r.Out.Header["X-Forwarded-Host"] = r.In.Header["X-Forwarded-Host"]
 									r.Out.Header["X-Forwarded-Proto"] = r.In.Header["X-Forwarded-Proto"]
@@ -243,24 +283,4 @@ func (r *Routy) Route() error {
 	}
 
 	return g.Wait()
-}
-
-func (r *Routy) getCertManager() (*autocert.Manager, error) {
-	model, err := models.NewModel()
-	if err != nil {
-		return nil, err
-	}
-
-	certDir, err := model.GetFilepath("certs")
-	if err != nil {
-		return nil, err
-	}
-
-	manager := &autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(r.hostnames...),
-		Cache:      autocert.DirCache(certDir),
-	}
-
-	return manager, nil
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,31 +9,12 @@ import (
 
 	"github.com/oorrwullie/routy/internal/handlers"
 	"github.com/oorrwullie/routy/internal/logging"
-	"github.com/oorrwullie/routy/internal/models"
 )
 
 func main() {
-	eventLog := make(chan logging.EventLogMessage)
-
-	go func() {
-		err := logging.StartEventLogger(eventLog)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	accessLog := make(chan *http.Request)
-
-	go func() {
-		err := logging.StartAccessLogger(accessLog)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	denyList, err := models.GetDenyList()
+	r, err := handlers.NewRouty()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error creating new Routy: %s", err)
 	}
 
 	shutdownChan := make(chan os.Signal, 1)
@@ -44,7 +24,7 @@ func main() {
 		<-shutdownChan
 
 		msg := "Received shutdown signal. Performing graceful shutdown..."
-		eventLog <- logging.EventLogMessage{
+		r.EventLog <- logging.EventLogMessage{
 			Level:   "INFO",
 			Caller:  "shutdown()",
 			Message: msg,
@@ -54,14 +34,8 @@ func main() {
 		os.Exit(0)
 	}()
 
-	r := handlers.NewRouty(
-		eventLog,
-		accessLog,
-		denyList,
-	)
-
 	msg := "Application is running..."
-	eventLog <- logging.EventLogMessage{
+	r.EventLog <- logging.EventLogMessage{
 		Level:   "INFO",
 		Caller:  "Main()",
 		Message: msg,
@@ -69,7 +43,7 @@ func main() {
 
 	err = r.Route()
 	if err != nil {
-		eventLog <- logging.EventLogMessage{
+		r.EventLog <- logging.EventLogMessage{
 			Level:   "ERROR",
 			Caller:  "main()->r.Route()",
 			Message: err.Error(),
