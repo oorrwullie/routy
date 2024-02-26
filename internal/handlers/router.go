@@ -203,6 +203,15 @@ func (r *Routy) Route() error {
 								req.Header.Set("X-Forwarded-Host", host)
 								req.Header.Set("X-Forwarded-Proto", targetURL.Scheme)
 
+								proxy.Rewrite = func(r *httputil.ProxyRequest) {
+									r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
+									r.Out.Header["X-Forwarded-Host"] = r.In.Header["X-Forwarded-Host"]
+									r.Out.Header["X-Forwarded-Proto"] = r.In.Header["X-Forwarded-Proto"]
+									r.SetXForwarded()
+									r.SetURL(targetURL)
+									r.Out.Host = r.In.Host
+								}
+
 								proxy.ServeHTTP(w, req)
 							},
 						)
