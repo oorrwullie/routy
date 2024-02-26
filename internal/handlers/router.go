@@ -90,8 +90,26 @@ func (r *Routy) Route() error {
 					}
 
 					proxy := &httputil.ReverseProxy{
+						Director: func(req *http.Request) {
+							// Resolve the hostname using the custom DNS resolver
+							rts, err := models.GetDomainRoutes()
+							if err != nil {
+								fmt.Println("Error resolving hostname:", err)
+								return
+							}
+							ip, err := resolve(targetURL.Host, dns.TypeA, rts)
+							if err != nil {
+								fmt.Println("Error resolving hostname:", err)
+								return
+							}
+
+							// Update the request's Host field to the resolved IP
+							req.Host = ip[0].String()
+							req.URL.Host = ip[0].String()
+						},
 						Rewrite: func(r *httputil.ProxyRequest) {
 							r.SetURL(targetURL)
+							r.SetXForwarded()
 							r.Out.Host = r.In.Host
 						},
 					}
@@ -287,7 +305,7 @@ func (t *preserveHeadersTransport) RoundTrip(req *http.Request) (*http.Response,
 	return resp, nil
 }
 
-func resolve(domain string, qtype uint16, routes *models.Routes) []dns.RR {
+func resolve(domain string, qtype uint16, routes *models.Routes) ([]dns.RR, error) {
 	answers := make([]dns.RR, 0)
 	m := new(dns.Msg)
 	m.SetQuestion(dns.Fqdn(domain), qtype)
@@ -317,19 +335,18 @@ func resolve(domain string, qtype uint16, routes *models.Routes) []dns.RR {
 	}
 
 	if len(answers) > 0 {
-		return answers
+		return answers, nil
 	}
 
 	c := new(dns.Client)
 	in, _, err := c.Exchange(m, "8.8.8.8:53")
 	if err != nil {
-		fmt.Println(err)
-		return nil
+		return nil, err
 	}
 
 	for _, ans := range in.Answer {
 		answers = append(answers, ans)
 	}
 
-	return answers
+	return answers, nil
 }
