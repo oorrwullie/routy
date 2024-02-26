@@ -86,9 +86,6 @@ func (r *Routy) Route() error {
 		return err
 	}
 
-	resolver := r.getDnsResolver()
-	net.DefaultResolver = resolver
-
 	for _, domain := range r.routes.Domains {
 		if len(domain.Paths) != 0 {
 			sd := models.Subdomain{
@@ -130,6 +127,8 @@ func (r *Routy) Route() error {
 							r.Out.Host = r.In.Host
 						},
 					}
+
+					proxy.Transport = r.getDnsResolver()
 
 					if path.Upgrade {
 						http.HandleFunc(path.Location, func(w http.ResponseWriter, req *http.Request) {

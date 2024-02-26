@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 
 	"github.com/oorrwullie/routy/internal/logging"
 )
 
-func (r *Routy) getDnsResolver() *net.Resolver {
+func (r *Routy) getDnsResolver() *http.Transport {
 	rMap := make(map[string]string)
 
 	for _, domain := range r.routes.Domains {
@@ -57,29 +58,15 @@ func (r *Routy) getDnsResolver() *net.Resolver {
 		}
 	}
 
-	resolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			hostname, _, err := net.SplitHostPort(address)
-			if err != nil {
-				msg := fmt.Sprintf("failed to split host and port: %v\n", err)
-				r.EventLog <- logging.EventLogMessage{
-					Level:   "ERROR",
-					Caller:  "Route()->net.SplitHostPort()",
-					Message: msg,
-				}
-
-				return net.Dial(network, address)
+	t := &http.Transport{
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			if resolvedAddr, ok := rMap[address]; ok {
+				return net.Dial(network, resolvedAddr)
 			}
 
-			host, ok := rMap[hostname]
-			if !ok {
-				return net.Dial(network, address)
-			}
-
-			return net.Dial(network, host)
+			return net.Dial(network, address)
 		},
 	}
 
-	return resolver
+	return t
 }
