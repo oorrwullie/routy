@@ -104,8 +104,9 @@ func (r *Routy) Route() error {
 							}
 
 							// Update the request's Host field to the resolved IP
-							req.Host = ip[0].String()
-							req.URL.Host = ip[0].String()
+							req.Host = ip[targetURL.Host].String()
+							req.URL.Host = ip[targetURL.Host].String()
+							req.URL.Path = targetURL.Path
 						},
 					}
 
@@ -300,8 +301,8 @@ func (t *preserveHeadersTransport) RoundTrip(req *http.Request) (*http.Response,
 	return resp, nil
 }
 
-func resolve(domain string, qtype uint16, routes *models.Routes) ([]dns.RR, error) {
-	answers := make([]dns.RR, 0)
+func resolve(domain string, qtype uint16, routes *models.Routes) (map[string]dns.RR, error) {
+	answers := make(map[string]dns.RR, 0)
 	m := new(dns.Msg)
 	m.SetQuestion(dns.Fqdn(domain), qtype)
 	m.RecursionDesired = true
@@ -324,7 +325,7 @@ func resolve(domain string, qtype uint16, routes *models.Routes) ([]dns.RR, erro
 				fmt.Println(url)
 				parsedIP := net.ParseIP(url.Hostname())
 				d.A = parsedIP
-				answers = append(answers, &d)
+				answers[url.Host] = &d
 			}
 		}
 	}
@@ -340,7 +341,7 @@ func resolve(domain string, qtype uint16, routes *models.Routes) ([]dns.RR, erro
 	}
 
 	for _, ans := range in.Answer {
-		answers = append(answers, ans)
+		answers[domain] = ans
 	}
 
 	return answers, nil
