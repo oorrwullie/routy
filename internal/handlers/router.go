@@ -114,6 +114,16 @@ func (r *Routy) Route() error {
 						continue
 					}
 
+					h, port, _ := net.SplitHostPort(targetURL.Host)
+
+					if sd.Name == domain.Name {
+						h = domain.Name
+					} else {
+						h = fmt.Sprintf("%s.%s", sd.Name, domain.Name)
+					}
+
+					targetURL.Host = net.JoinHostPort(h, port)
+
 					proxy := &httputil.ReverseProxy{
 						Rewrite: func(r *httputil.ProxyRequest) {
 							r.SetURL(targetURL)
