@@ -33,34 +33,45 @@ All configuration and log files are found in either `/var/routy` or `$HOME/routy
 The cfg.yaml file contains the configuration for the base hostname and subdomains. A typical configuration including a configuration for a websocket looks like this:
 The timeouts are in milliseconds. All websocket paths are `/ws` on their respective subdomains.
 ```yaml
-domains:
-  - name: example.com
-    paths:
-      - location: /
-        target: http://127.0.0.2
-        upgrade: false
-    subdomains:
-      - name: foo
-        paths:
-          - location: /
-            upgrade: false
-            target: http://127.0.0.1
-          - location: /ws
-            upgrade: true
-            target: http://127.0.0.1:1234
-            listenPort: 1234
-  - name: anotherexample.com
-    subdomains:
-      - name: flip
-        paths:
-          - location: /
-            upgrade: false
-            target: http://192.168.0.2
-      - name: flop
-        paths:
-          - location: /
-            upgrade: false
-            target: https://192.168.0.6:8443
+ssh:
+    enabled: true
+    listenPort: 22
+    configs:
+      - domain: example.com
+        host: 127.0.0.2
+        port: 22
+      - domain: foo.example.com
+        host: 127.0.0.1
+        port: 23
+http:
+  domains:
+    - name: example.com
+      paths:
+        - location: /
+          target: http://127.0.0.2
+          upgrade: false
+      subdomains:
+        - name: foo
+          paths:
+            - location: /
+              upgrade: false
+              target: http://127.0.0.1
+            - location: /ws
+              upgrade: true
+              target: http://127.0.0.1:1234
+              listenPort: 1234
+    - name: anotherexample.com
+      subdomains:
+        - name: flip
+          paths:
+            - location: /
+              upgrade: false
+              target: http://192.168.0.2
+        - name: flop
+          paths:
+            - location: /
+              upgrade: false
+              target: https://192.168.0.6:8443
 ```
 
 ### Deny List
