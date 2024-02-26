@@ -107,11 +107,6 @@ func (r *Routy) Route() error {
 							req.Host = ip[0].String()
 							req.URL.Host = ip[0].String()
 						},
-						Rewrite: func(r *httputil.ProxyRequest) {
-							r.SetURL(targetURL)
-							r.SetXForwarded()
-							r.Out.Host = r.In.Host
-						},
 					}
 
 					// proxy = httputil.NewSingleHostReverseProxy(targetURL)
