@@ -13,7 +13,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -93,9 +92,6 @@ func (r *Routy) Route() error {
 							r.Out.Host = r.In.Host
 						},
 					}
-
-					// proxy = httputil.NewSingleHostReverseProxy(targetURL)
-					// proxy.Transport = &preserveHeadersTransport{targetURL: targetURL}
 
 					if path.Upgrade {
 						http.HandleFunc(path.Location, func(w http.ResponseWriter, req *http.Request) {
@@ -183,24 +179,8 @@ func (r *Routy) Route() error {
 							http.ListenAndServe(fmt.Sprintf(":%d", path.ListenPort), nil)
 						}()
 					} else {
-
-						subdomainHandler := func(w http.ResponseWriter, req *http.Request) {
-							if r.denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-								return
-							}
-
-							r.accessLog <- req
-
-							req.Host = req.URL.Host
-							req.Header.Set("X-Forwarded", "true")
-							req.Header.Set("X-Forwarded-For", req.RemoteAddr)
-							req.Header.Set("X-Forwarded-Host", req.Host)
-							req.Header.Set("X-Forwarded-Proto", req.URL.Scheme)
-
-							proxy.ServeHTTP(w, req)
-						}
-
 						var host string
+
 						if sd.Name == domain.Name {
 							host = domain.Name
 						} else {
@@ -208,7 +188,23 @@ func (r *Routy) Route() error {
 						}
 
 						subdomainRouter := router.Host(host).Subrouter()
-						subdomainRouter.PathPrefix(path.Location).Handler(http.HandlerFunc(subdomainHandler))
+						subdomainRouter.PathPrefix(path.Location).HandlerFunc(
+							func(w http.ResponseWriter, req *http.Request) {
+								if r.denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
+									return
+								}
+
+								r.accessLog <- req
+
+								req.Host = req.URL.Host
+								req.Header.Set("X-Forwarded", "true")
+								req.Header.Set("X-Forwarded-For", req.RemoteAddr)
+								req.Header.Set("X-Forwarded-Host", host)
+								req.Header.Set("X-Forwarded-Proto", targetURL.Scheme)
+
+								proxy.ServeHTTP(w, req)
+							},
+						)
 					}
 				}
 			}
@@ -237,50 +233,4 @@ func (r *Routy) Route() error {
 	}
 
 	return g.Wait()
-}
-
-func (r *Routy) getCertManager() (*autocert.Manager, error) {
-	model, err := models.NewModel()
-	if err != nil {
-		return nil, err
-	}
-
-	certDir, err := model.GetFilepath("certs")
-	if err != nil {
-		return nil, err
-	}
-
-	manager := &autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(r.hostnames...),
-		Cache:      autocert.DirCache(certDir),
-	}
-
-	return manager, nil
-}
-
-type preserveHeadersTransport struct {
-	http.Transport
-	targetURL *url.URL
-}
-
-func (t *preserveHeadersTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Clone the request to avoid modifying the original
-	reqCopy := req.Clone(req.Context())
-
-	// Set the Host header of the cloned request to match the target server
-	reqCopy.Host = t.targetURL.Host
-
-	// Make the actual request
-	resp, err := t.Transport.RoundTrip(reqCopy)
-	if err != nil {
-		return nil, err
-	}
-
-	// Copy the headers from the response to the original request
-	for key, values := range resp.Header {
-		req.Header[key] = values
-	}
-
-	return resp, nil
 }
