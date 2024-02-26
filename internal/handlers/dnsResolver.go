@@ -60,7 +60,8 @@ func (r *Routy) getDnsResolver() *http.Transport {
 
 	t := &http.Transport{
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
-			if resolvedAddr, ok := rMap[address]; ok {
+			host, _, _ := net.SplitHostPort(address)
+			if resolvedAddr, ok := rMap[host]; ok {
 				return net.Dial(network, resolvedAddr)
 			}
 
