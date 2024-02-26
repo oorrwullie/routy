@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -233,4 +234,24 @@ func (r *Routy) Route() error {
 	}
 
 	return g.Wait()
+}
+
+func (r *Routy) getCertManager() (*autocert.Manager, error) {
+	model, err := models.NewModel()
+	if err != nil {
+		return nil, err
+	}
+
+	certDir, err := model.GetFilepath("certs")
+	if err != nil {
+		return nil, err
+	}
+
+	manager := &autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(r.hostnames...),
+		Cache:      autocert.DirCache(certDir),
+	}
+
+	return manager, nil
 }
