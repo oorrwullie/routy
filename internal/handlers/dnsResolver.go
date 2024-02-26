@@ -7,20 +7,30 @@ import (
 	"net/url"
 
 	"github.com/oorrwullie/routy/internal/logging"
-	"github.com/oorrwullie/routy/internal/models"
 )
 
 func (r *Routy) getDnsResolver() *net.Resolver {
-	var resolverMap map[string]string
+	rMap := make(map[string]string)
 
 	for _, domain := range r.routes.Domains {
 		if len(domain.Paths) != 0 {
-			sd := models.Subdomain{
-				Name:  domain.Name,
-				Paths: domain.Paths,
-			}
+			for _, path := range domain.Paths {
+				targetURL, err := url.Parse(path.Target)
+				if err != nil {
+					msg := fmt.Sprintf("failed to parse target URL for domain %s path %s: %v\n", domain.Name, path.Location, err)
+					r.EventLog <- logging.EventLogMessage{
+						Level:   "ERROR",
+						Caller:  "Route()->url.Parse()",
+						Message: msg,
+					}
 
-			domain.Subdomains = append(domain.Subdomains, sd)
+					continue
+				}
+
+				rMap[domain.Name] = targetURL.Host
+
+				break
+			}
 		}
 
 		for _, sd := range domain.Subdomains {
@@ -38,7 +48,10 @@ func (r *Routy) getDnsResolver() *net.Resolver {
 						continue
 					}
 
-					resolverMap[targetURL.Host] = targetURL.Host
+					dName := fmt.Sprintf("%s.%s", sd.Name, domain.Name)
+					rMap[dName] = targetURL.Host
+
+					break
 				}
 			}
 		}
@@ -47,7 +60,19 @@ func (r *Routy) getDnsResolver() *net.Resolver {
 	resolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			host, ok := resolverMap[address]
+			hostname, _, err := net.SplitHostPort(address)
+			if err != nil {
+				msg := fmt.Sprintf("failed to split host and port: %v\n", err)
+				r.EventLog <- logging.EventLogMessage{
+					Level:   "ERROR",
+					Caller:  "Route()->net.SplitHostPort()",
+					Message: msg,
+				}
+
+				return net.Dial(network, address)
+			}
+
+			host, ok := rMap[hostname]
 			if !ok {
 				return net.Dial(network, address)
 			}
