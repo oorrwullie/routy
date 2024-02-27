@@ -128,8 +128,6 @@ func (r *Routy) Route() error {
 						},
 					}
 
-					proxy.Transport = r.getDnsResolver()
-
 					if path.Upgrade {
 						http.HandleFunc(path.Location, func(w http.ResponseWriter, req *http.Request) {
 							if r.denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
@@ -251,15 +249,22 @@ func (r *Routy) Route() error {
 								req.Header.Set("X-Forwarded-Host", host)
 								req.Header.Set("X-Forwarded-Proto", targetURL.Scheme)
 
-								proxy.Rewrite = func(r *httputil.ProxyRequest) {
-									r.Out.Header["X-Forwarded"] = r.In.Header["X-Forwarded"]
-									r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
-									r.Out.Header["X-Forwarded-Host"] = r.In.Header["X-Forwarded-Host"]
-									r.Out.Header["X-Forwarded-Proto"] = r.In.Header["X-Forwarded-Proto"]
-									r.SetXForwarded()
-									r.SetURL(targetURL)
-									r.Out.Host = r.In.Host
+								// proxy.Rewrite = func(r *httputil.ProxyRequest) {
+								// 	r.Out.Header["X-Forwarded"] = r.In.Header["X-Forwarded"]
+								// 	r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
+								// 	r.Out.Header["X-Forwarded-Host"] = r.In.Header["X-Forwarded-Host"]
+								// 	r.Out.Header["X-Forwarded-Proto"] = r.In.Header["X-Forwarded-Proto"]
+								// 	r.SetXForwarded()
+								// 	r.SetURL(targetURL)
+								// 	r.Out.Host = r.In.Host
+								// }
+								proxy.Director = func(req *http.Request) {
+									req.Header = r.getHeaders(req)
+									req.URL = targetURL
+									req.Host = targetURL.Host
 								}
+
+								proxy.Transport = r.getDnsResolver()
 
 								proxy.ServeHTTP(w, req)
 							},
@@ -292,4 +297,14 @@ func (r *Routy) Route() error {
 	}
 
 	return g.Wait()
+}
+
+func (r *Routy) getHeaders(req *http.Request) http.Header {
+	headers := make(http.Header)
+
+	for key, value := range req.Header {
+		headers[key] = value
+	}
+
+	return headers
 }
