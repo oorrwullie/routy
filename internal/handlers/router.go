@@ -129,7 +129,7 @@ func (r *Routy) Route() error {
 							r.Out.Header["X-Forwarded-Proto"] = r.In.Header["X-Forwarded-Proto"]
 							r.SetXForwarded()
 							r.SetURL(targetURL)
-							r.Out.Host = r.In.Host
+							r.Out.Host = targetURL.Host
 						},
 						Transport: r.getDnsResolver(),
 					}
