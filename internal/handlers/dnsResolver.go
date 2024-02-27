@@ -6,12 +6,30 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 
 	"github.com/oorrwullie/routy/internal/logging"
 )
 
+type resolver struct {
+	mu sync.Mutex
+	m  map[string]string
+}
+
+func (res *resolver) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	res.mu.Lock()
+	defer res.mu.Unlock()
+
+	host, _, _ := net.SplitHostPort(address)
+
+	if resolvedAddr, ok := res.m[host]; ok {
+		return net.Dial(network, resolvedAddr)
+	}
+	return net.Dial(network, address)
+}
+
 func (r *Routy) getDnsResolver() *http.Transport {
-	rMap := make(map[string]string)
+	m := make(map[string]string)
 
 	for _, domain := range r.routes.Domains {
 		if len(domain.Paths) != 0 {
@@ -28,7 +46,7 @@ func (r *Routy) getDnsResolver() *http.Transport {
 					continue
 				}
 
-				rMap[domain.Name] = targetURL.Host
+				m[domain.Name] = targetURL.Host
 
 				break
 			}
@@ -50,7 +68,7 @@ func (r *Routy) getDnsResolver() *http.Transport {
 					}
 
 					dName := fmt.Sprintf("%s.%s", sd.Name, domain.Name)
-					rMap[dName] = targetURL.Host
+					m[dName] = targetURL.Host
 
 					break
 				}
@@ -59,14 +77,7 @@ func (r *Routy) getDnsResolver() *http.Transport {
 	}
 
 	t := &http.Transport{
-		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
-			host, _, _ := net.SplitHostPort(address)
-			if resolvedAddr, ok := rMap[host]; ok {
-				return net.Dial(network, resolvedAddr)
-			}
-
-			return net.Dial(network, address)
-		},
+		DialContext: (&resolver{m: m}).DialContext,
 	}
 
 	return t
