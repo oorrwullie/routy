@@ -121,17 +121,18 @@ func (r *Routy) Route() error {
 
 					targetURL.Host = net.JoinHostPort(h, port)
 
-					proxy := &httputil.ReverseProxy{
-						Rewrite: func(r *httputil.ProxyRequest) {
-							r.SetURL(targetURL)
-							r.Out.Host = r.In.Host
-						},
-					}
+					proxy := &httputil.ReverseProxy{}
+					proxy.Transport = r.getDnsResolver()
 
 					if path.Upgrade {
 						http.HandleFunc(path.Location, func(w http.ResponseWriter, req *http.Request) {
 							if r.denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
 								return
+							}
+
+							proxy.Rewrite = func(r *httputil.ProxyRequest) {
+								r.SetURL(targetURL)
+								r.Out.Host = r.In.Host
 							}
 
 							r.accessLog <- req
@@ -263,8 +264,6 @@ func (r *Routy) Route() error {
 									req.URL = targetURL
 									req.Host = targetURL.Host
 								}
-
-								proxy.Transport = r.getDnsResolver()
 
 								proxy.ServeHTTP(w, req)
 							},
