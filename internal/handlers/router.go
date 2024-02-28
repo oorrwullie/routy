@@ -3,19 +3,16 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 
 	"github.com/oorrwullie/routy/internal/logging"
 	"github.com/oorrwullie/routy/internal/models"
 
 	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 	"golang.org/x/sync/errgroup"
 )
 
+// Routy is the main struct for the router
 type Routy struct {
 	accessLog chan *http.Request
 	denyList  *models.DenyList
@@ -24,12 +21,7 @@ type Routy struct {
 	routes    *models.Routes
 }
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
+// NewRouty creates a new instance of the Routy struct
 func NewRouty() (*Routy, error) {
 	routes, err := models.GetDomainRoutes()
 	if err != nil {
@@ -43,6 +35,7 @@ func NewRouty() (*Routy, error) {
 
 	accessLog := make(chan *http.Request)
 
+	// start the access logger
 	go func() {
 		err := logging.StartAccessLogger(accessLog)
 		if err != nil {
@@ -52,6 +45,7 @@ func NewRouty() (*Routy, error) {
 
 	eventLog := make(chan logging.EventLogMessage)
 
+	// start the event logger
 	go func() {
 		err := logging.StartEventLogger(eventLog)
 		if err != nil {
@@ -67,6 +61,7 @@ func NewRouty() (*Routy, error) {
 	}, nil
 }
 
+// Route starts the routing process
 func (r *Routy) Route() error {
 	router := mux.NewRouter()
 
@@ -99,166 +94,10 @@ func (r *Routy) Route() error {
 		for _, sd := range domain.Subdomains {
 			if len(sd.Paths) != 0 {
 				for _, path := range sd.Paths {
-					targetURL, err := url.Parse(path.Target)
-					if err != nil {
-						msg := fmt.Sprintf("failed to parse target URL for subdomain %s path %s: %v\n", sd.Name, path.Location, err)
-						r.EventLog <- logging.EventLogMessage{
-							Level:   "ERROR",
-							Caller:  "Route()->url.Parse()",
-							Message: msg,
-						}
-
-						continue
-					}
-
-					h, port, _ := net.SplitHostPort(targetURL.Host)
-
-					if sd.Name == domain.Name {
-						h = domain.Name
-					} else {
-						h = fmt.Sprintf("%s.%s", sd.Name, domain.Name)
-					}
-
-					targetURL.Host = net.JoinHostPort(h, port)
-
-					proxy := &httputil.ReverseProxy{
-						Rewrite: func(r *httputil.ProxyRequest) {
-							r.Out.Header["X-Forwarded"] = r.In.Header["X-Forwarded"]
-							r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
-							r.Out.Header["X-Forwarded-Host"] = r.In.Header["X-Forwarded-Host"]
-							r.Out.Header["X-Forwarded-Proto"] = r.In.Header["X-Forwarded-Proto"]
-							r.SetXForwarded()
-							r.SetURL(targetURL)
-							host, _, _ := net.SplitHostPort(targetURL.Host)
-							r.Out.Host = host
-						},
-						Transport: r.getDnsResolver(),
-					}
-
 					if path.Upgrade {
-						http.HandleFunc(path.Location, func(w http.ResponseWriter, req *http.Request) {
-							if r.denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-								return
-							}
-
-							r.accessLog <- req
-
-							conn, err := upgrader.Upgrade(w, req, nil)
-							if err != nil {
-								msg := fmt.Sprintf("Error upgrading connection to WebSocket: %v", err)
-								r.EventLog <- logging.EventLogMessage{
-									Level:   "ERROR",
-									Caller:  "handleWebSocket()->upgrader.Upgrade()",
-									Message: msg,
-								}
-
-								return
-							}
-							defer conn.Close()
-
-							targetWs, _, err := websocket.DefaultDialer.Dial(path.Target, req.Header)
-							if err != nil {
-								msg := fmt.Sprintf("Error connecting to target server: %v", err)
-								r.EventLog <- logging.EventLogMessage{
-									Level:   "ERROR",
-									Caller:  "handleWebSocket()->websocket.DefaultDialer.Dial()",
-									Message: msg,
-								}
-
-								return
-							}
-							defer targetWs.Close()
-
-							// Bidirectional proxy
-							go func() {
-								defer targetWs.Close()
-								defer conn.Close()
-
-								for {
-									_, message, err := conn.ReadMessage()
-									if err != nil {
-										msg := fmt.Sprintf("Error receiving message from client: %v", err)
-										r.EventLog <- logging.EventLogMessage{
-											Level:   "ERROR",
-											Caller:  "handleWebSocket()->conn.ReadMessage()",
-											Message: msg,
-										}
-
-										return
-									}
-
-									err = targetWs.WriteMessage(websocket.TextMessage, message)
-									if err != nil {
-										msg := fmt.Sprintf("Error sending message to target server: %v", err)
-										r.EventLog <- logging.EventLogMessage{
-											Level:   "ERROR",
-											Caller:  "handleWebSocket()->targetWs.WriteMessage()",
-											Message: msg,
-										}
-
-										return
-									}
-								}
-							}()
-
-							for {
-								_, message, err := targetWs.ReadMessage()
-								if err != nil {
-									msg := fmt.Sprintf("Error receiving message from target server: %v", err)
-									r.EventLog <- logging.EventLogMessage{
-										Level:   "ERROR",
-										Caller:  "handleWebSocket()->targetWs.ReadMessage()",
-										Message: msg,
-									}
-
-									return
-								}
-
-								err = conn.WriteMessage(websocket.TextMessage, message)
-								if err != nil {
-									msg := fmt.Sprintf("Error sending message to client: %v", err)
-									r.EventLog <- logging.EventLogMessage{
-										Level:   "ERROR",
-										Caller:  "handleWebSocket()->conn.WriteMessage()",
-										Message: msg,
-									}
-
-									return
-								}
-							}
-
-						})
-
-						go func(path models.Path) {
-							http.ListenAndServe(fmt.Sprintf(":%d", path.ListenPort), nil)
-						}(path)
+						go r.handleWebSocket(path)
 					} else {
-						var host string
-
-						if sd.Name == domain.Name {
-							host = domain.Name
-						} else {
-							host = fmt.Sprintf("%s.%s", sd.Name, domain.Name)
-						}
-
-						subdomainRouter := router.Host(host).Subrouter()
-						subdomainRouter.PathPrefix(path.Location).HandlerFunc(
-							func(w http.ResponseWriter, req *http.Request) {
-								if r.denyList.IsDenied(logging.GetRequestRemoteAddress(req)) {
-									return
-								}
-
-								r.accessLog <- req
-
-								req.Host = req.URL.Host
-								req.Header.Set("X-Forwarded", "true")
-								req.Header.Set("X-Forwarded-For", req.RemoteAddr)
-								req.Header.Set("X-Forwarded-Host", host)
-								req.Header.Set("X-Forwarded-Proto", targetURL.Scheme)
-
-								proxy.ServeHTTP(w, req)
-							},
-						)
+						go r.handleHttp(router, domain, sd, path)
 					}
 				}
 			}
@@ -280,6 +119,7 @@ func (r *Routy) Route() error {
 			TLSConfig: certManager.TLSConfig(),
 		}
 
+		// start the https server
 		g.Go(func() error {
 			return server.ListenAndServeTLS("", "")
 		})
@@ -287,14 +127,4 @@ func (r *Routy) Route() error {
 	}
 
 	return g.Wait()
-}
-
-func (r *Routy) getHeaders(req *http.Request) http.Header {
-	headers := make(http.Header)
-
-	for key, value := range req.Header {
-		headers[key] = value
-	}
-
-	return headers
 }
