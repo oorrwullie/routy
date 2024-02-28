@@ -95,10 +95,8 @@ func (r *Routy) Route() error {
 			if len(sd.Paths) != 0 {
 				for _, path := range sd.Paths {
 					if path.Upgrade {
-						// handle websockets
 						go r.handleWebSocket(path)
 					} else {
-						// handle http
 						go r.handleHttp(router, domain, sd, path)
 					}
 				}
