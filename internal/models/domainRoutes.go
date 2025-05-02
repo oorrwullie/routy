@@ -8,13 +8,18 @@ const configFilename string = "cfg.yaml"
 
 type (
 	Routes struct {
+		Http Http `yaml:"http"`
+		Ssh  Ssh  `yaml:"ssh"`
+	}
+
+	Http struct {
 		Domains []Domain `yaml:"domains"`
 	}
 
 	Domain struct {
 		Name       string      `yaml:"name"`
-		Subdomains []Subdomain `yaml:"subdomains"`
 		Paths      []Path      `yaml:"paths"`
+		Subdomains []Subdomain `yaml:"subdomains"`
 	}
 
 	Subdomain struct {
@@ -23,10 +28,21 @@ type (
 	}
 
 	Path struct {
-		Location   string `yaml:"location"`
-		Upgrade    bool   `yaml:"upgrade"`
-		Target     string `yaml:"target"`
 		ListenPort int    `yaml:"listenPort,omitempty"`
+		Location   string `yaml:"location"`
+		Target     string `yaml:"target"`
+		Upgrade    bool   `yaml:"upgrade"`
+	}
+
+	Ssh struct {
+		Configs    []SshConfig `yaml:"configs"`
+		Enabled    bool        `yaml:"enabled"`
+		ListenPort int         `yaml:"listenPort"`
+	}
+
+	SshConfig struct {
+		Host string `yaml:"host"`
+		Port int    `yaml:"port"`
 	}
 )
 

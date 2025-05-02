@@ -63,6 +63,7 @@ func NewRouty() (*Routy, error) {
 
 // Route starts the routing process
 func (r *Routy) Route() error {
+
 	router := mux.NewRouter()
 
 	g, _ := errgroup.WithContext(context.Background())
@@ -77,9 +78,11 @@ func (r *Routy) Route() error {
 	}
 
 	certManager, err := r.getCertManager()
-	if err != nil {
+
+  if err != nil {
 		return err
 	}
+
 
 	for _, domain := range r.routes.Domains {
 		if len(domain.Paths) != 0 {
