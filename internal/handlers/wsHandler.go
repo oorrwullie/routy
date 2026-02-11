@@ -13,7 +13,13 @@ func (r *Routy) handleWebSocket(path models.Path) {
 	http.HandleFunc(path.Location, r.wsHandleFunc(path))
 
 	go func(path models.Path) {
-		http.ListenAndServe(fmt.Sprintf(":%d", path.ListenPort), nil)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", path.ListenPort), nil); err != nil && err != http.ErrServerClosed {
+			r.EventLog <- logging.EventLogMessage{
+				Level:   "ERROR",
+				Caller:  "handleWebSocket()->http.ListenAndServe()",
+				Message: fmt.Sprintf("failed to start websocket server: %v", err),
+			}
+		}
 	}(path)
 }
 
@@ -43,7 +49,9 @@ func (r *Routy) wsHandleFunc(path models.Path) func(http.ResponseWriter, *http.R
 
 			return
 		}
-		defer conn.Close()
+		defer func() {
+			_ = conn.Close()
+		}()
 
 		targetWs, _, err := websocket.DefaultDialer.Dial(path.Target, req.Header)
 		if err != nil {
@@ -56,12 +64,18 @@ func (r *Routy) wsHandleFunc(path models.Path) func(http.ResponseWriter, *http.R
 
 			return
 		}
-		defer targetWs.Close()
+		defer func() {
+			_ = targetWs.Close()
+		}()
 
 		// Bidirectional proxy
 		go func() {
-			defer targetWs.Close()
-			defer conn.Close()
+			defer func() {
+				_ = targetWs.Close()
+			}()
+			defer func() {
+				_ = conn.Close()
+			}()
 
 			for {
 				_, message, err := conn.ReadMessage()

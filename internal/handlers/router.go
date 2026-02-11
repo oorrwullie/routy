@@ -110,7 +110,13 @@ func (r *Routy) Route() error {
 				Handler: certManager.HTTPHandler(nil),
 			}
 
-			httpServer.ListenAndServe()
+			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				r.EventLog <- logging.EventLogMessage{
+					Level:   "ERROR",
+					Caller:  "Route()->httpServer.ListenAndServe()",
+					Message: fmt.Sprintf("failed to start http server: %v", err),
+				}
+			}
 		}()
 
 		server := &http.Server{
