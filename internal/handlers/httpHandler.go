@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/oorrwullie/routy/internal/logging"
@@ -65,7 +67,70 @@ func (r *Routy) handleHttp(router *mux.Router, domain models.Domain, sd models.S
 			}
 
 			r.accessLog <- req
+
+			if sd.CORS != nil {
+				applyCORSHeaders(w, req, sd.CORS)
+				if req.Method == http.MethodOptions {
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+			}
 			proxy.ServeHTTP(w, req)
 		},
 	)
+}
+
+func applyCORSHeaders(w http.ResponseWriter, req *http.Request, cfg *models.CORSConfig) {
+	if cfg == nil {
+		return
+	}
+
+	origin := req.Header.Get("Origin")
+	allowOrigin, vary := corsAllowedOrigin(origin, cfg.AllowOrigins, cfg.AllowCredentials)
+	if allowOrigin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+		if vary {
+			w.Header().Add("Vary", "Origin")
+		}
+	}
+
+	if cfg.AllowCredentials {
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
+
+	if len(cfg.AllowMethods) > 0 {
+		w.Header().Set("Access-Control-Allow-Methods", strings.Join(cfg.AllowMethods, ", "))
+	}
+
+	if len(cfg.AllowHeaders) > 0 {
+		w.Header().Set("Access-Control-Allow-Headers", strings.Join(cfg.AllowHeaders, ", "))
+	}
+
+	if len(cfg.ExposeHeaders) > 0 {
+		w.Header().Set("Access-Control-Expose-Headers", strings.Join(cfg.ExposeHeaders, ", "))
+	}
+
+	if cfg.MaxAge > 0 {
+		w.Header().Set("Access-Control-Max-Age", strconv.Itoa(cfg.MaxAge))
+	}
+}
+
+func corsAllowedOrigin(origin string, allowOrigins []string, allowCredentials bool) (string, bool) {
+	if origin == "" || len(allowOrigins) == 0 {
+		return "", false
+	}
+
+	for _, o := range allowOrigins {
+		if o == "*" {
+			if allowCredentials {
+				return origin, true
+			}
+			return "*", false
+		}
+		if o == origin {
+			return origin, true
+		}
+	}
+
+	return "", false
 }

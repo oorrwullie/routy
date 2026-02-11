@@ -18,8 +18,18 @@ type (
 	}
 
 	Subdomain struct {
-		Name  string `yaml:"name"`
-		Paths []Path `yaml:"paths"`
+		Name  string      `yaml:"name"`
+		CORS  *CORSConfig `yaml:"cors,omitempty"`
+		Paths []Path      `yaml:"paths"`
+	}
+
+	CORSConfig struct {
+		AllowOrigins    []string `yaml:"allowOrigins,omitempty"`
+		AllowMethods    []string `yaml:"allowMethods,omitempty"`
+		AllowHeaders    []string `yaml:"allowHeaders,omitempty"`
+		ExposeHeaders   []string `yaml:"exposeHeaders,omitempty"`
+		AllowCredentials bool     `yaml:"allowCredentials,omitempty"`
+		MaxAge          int      `yaml:"maxAge,omitempty"`
 	}
 
 	Path struct {
