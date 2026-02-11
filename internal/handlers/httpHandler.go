@@ -81,8 +81,8 @@ func (r *Routy) handleHttp(router *mux.Router, domain models.Domain, sd models.S
 			r.accessLog <- req
 
 			if sd.CORS != nil {
-				enforceCORSHeaders(w.Header(), req, sd.CORS)
 				if req.Method == http.MethodOptions {
+					enforceCORSHeaders(w.Header(), req, sd.CORS)
 					w.WriteHeader(http.StatusNoContent)
 					return
 				}
