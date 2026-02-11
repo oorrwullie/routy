@@ -41,6 +41,13 @@ domains:
         upgrade: false
     subdomains:
       - name: foo
+        cors:
+          allowOrigins: ["https://app.example.com"]
+          allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          allowHeaders: ["Content-Type", "Authorization"]
+          exposeHeaders: ["X-Request-Id"]
+          allowCredentials: true
+          maxAge: 600
         paths:
           - location: /
             upgrade: false
