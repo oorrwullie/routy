@@ -48,6 +48,18 @@ func (r *Routy) handleHttp(router *mux.Router, domain models.Domain, sd models.S
 			host, _, _ := net.SplitHostPort(targetURL.Host)
 			req.Out.Host = host
 		},
+		ModifyResponse: func(resp *http.Response) error {
+			if sd.CORS != nil && resp != nil && resp.Request != nil {
+				enforceCORSHeaders(resp.Header, resp.Request, sd.CORS)
+			}
+			return nil
+		},
+		ErrorHandler: func(w http.ResponseWriter, req *http.Request, err error) {
+			if sd.CORS != nil {
+				enforceCORSHeaders(w.Header(), req, sd.CORS)
+			}
+			http.Error(w, "Bad Gateway", http.StatusBadGateway)
+		},
 		Transport: r.getDnsResolver(),
 	}
 
@@ -69,7 +81,7 @@ func (r *Routy) handleHttp(router *mux.Router, domain models.Domain, sd models.S
 			r.accessLog <- req
 
 			if sd.CORS != nil {
-				applyCORSHeaders(w, req, sd.CORS)
+				enforceCORSHeaders(w.Header(), req, sd.CORS)
 				if req.Method == http.MethodOptions {
 					w.WriteHeader(http.StatusNoContent)
 					return
@@ -80,38 +92,40 @@ func (r *Routy) handleHttp(router *mux.Router, domain models.Domain, sd models.S
 	)
 }
 
-func applyCORSHeaders(w http.ResponseWriter, req *http.Request, cfg *models.CORSConfig) {
+func enforceCORSHeaders(header http.Header, req *http.Request, cfg *models.CORSConfig) {
 	if cfg == nil {
 		return
 	}
 
+	clearCORSHeaders(header)
+
 	origin := req.Header.Get("Origin")
 	allowOrigin, vary := corsAllowedOrigin(origin, cfg.AllowOrigins, cfg.AllowCredentials)
 	if allowOrigin != "" {
-		w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+		header.Set("Access-Control-Allow-Origin", allowOrigin)
 		if vary {
-			w.Header().Add("Vary", "Origin")
+			header.Add("Vary", "Origin")
 		}
 	}
 
 	if cfg.AllowCredentials {
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		header.Set("Access-Control-Allow-Credentials", "true")
 	}
 
 	if len(cfg.AllowMethods) > 0 {
-		w.Header().Set("Access-Control-Allow-Methods", strings.Join(cfg.AllowMethods, ", "))
+		header.Set("Access-Control-Allow-Methods", strings.Join(cfg.AllowMethods, ", "))
 	}
 
 	if len(cfg.AllowHeaders) > 0 {
-		w.Header().Set("Access-Control-Allow-Headers", strings.Join(cfg.AllowHeaders, ", "))
+		header.Set("Access-Control-Allow-Headers", strings.Join(cfg.AllowHeaders, ", "))
 	}
 
 	if len(cfg.ExposeHeaders) > 0 {
-		w.Header().Set("Access-Control-Expose-Headers", strings.Join(cfg.ExposeHeaders, ", "))
+		header.Set("Access-Control-Expose-Headers", strings.Join(cfg.ExposeHeaders, ", "))
 	}
 
 	if cfg.MaxAge > 0 {
-		w.Header().Set("Access-Control-Max-Age", strconv.Itoa(cfg.MaxAge))
+		header.Set("Access-Control-Max-Age", strconv.Itoa(cfg.MaxAge))
 	}
 }
 
@@ -133,4 +147,13 @@ func corsAllowedOrigin(origin string, allowOrigins []string, allowCredentials bo
 	}
 
 	return "", false
+}
+
+func clearCORSHeaders(header http.Header) {
+	header.Del("Access-Control-Allow-Origin")
+	header.Del("Access-Control-Allow-Credentials")
+	header.Del("Access-Control-Allow-Methods")
+	header.Del("Access-Control-Allow-Headers")
+	header.Del("Access-Control-Expose-Headers")
+	header.Del("Access-Control-Max-Age")
 }
