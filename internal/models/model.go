@@ -16,6 +16,10 @@ type Model struct {
 func NewModel() (*Model, error) {
 	var dataDir string
 
+	if envDir := os.Getenv("ROUTY_DATA_DIR"); envDir != "" {
+		return &Model{DataDir: envDir}, nil
+	}
+
 	if _, err := os.Stat("/var/routy"); err == nil {
 		dataDir = "/var/routy"
 	} else {
