@@ -33,7 +33,9 @@ func StartEventLogger(logChan <-chan EventLogMessage) error {
 			logMsg.Message,
 		)
 
-		m.WriteToEventLog(entry)
+		if err := m.WriteToEventLog(entry); err != nil {
+			continue
+		}
 	}
 
 	return nil
