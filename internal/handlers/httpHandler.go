@@ -27,8 +27,9 @@ func (r *Routy) handleHttp(router *mux.Router, domain models.Domain, sd models.S
 		return
 	}
 
-	h, port, _ := net.SplitHostPort(targetURL.Host)
+	_, port, _ := net.SplitHostPort(targetURL.Host)
 
+	var h string
 	if sd.Name == domain.Name {
 		h = domain.Name
 	} else {
