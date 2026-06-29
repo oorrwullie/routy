@@ -33,3 +33,12 @@ domains:
           - location: /
             upgrade: false
             target: https://192.168.0.6:8443
+
+# Optional raw TLS passthrough routes. Routy reads SNI and proxies the
+# encrypted stream without terminating TLS. These routes share :443 with
+# the managed HTTPS reverse proxy.
+tlsRoutes:
+  - host: vault.example.com
+    target: 10.0.0.20:443
+  - host: mqtt.example.com
+    target: tls://10.0.0.30:8883

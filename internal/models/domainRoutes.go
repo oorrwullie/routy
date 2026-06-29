@@ -8,7 +8,8 @@ const configFilename string = "cfg.yaml"
 
 type (
 	Routes struct {
-		Domains []Domain `yaml:"domains"`
+		Domains   []Domain   `yaml:"domains"`
+		TLSRoutes []TLSRoute `yaml:"tlsRoutes,omitempty"`
 	}
 
 	Domain struct {
@@ -24,12 +25,12 @@ type (
 	}
 
 	CORSConfig struct {
-		AllowOrigins    []string `yaml:"allowOrigins,omitempty"`
-		AllowMethods    []string `yaml:"allowMethods,omitempty"`
-		AllowHeaders    []string `yaml:"allowHeaders,omitempty"`
-		ExposeHeaders   []string `yaml:"exposeHeaders,omitempty"`
+		AllowOrigins     []string `yaml:"allowOrigins,omitempty"`
+		AllowMethods     []string `yaml:"allowMethods,omitempty"`
+		AllowHeaders     []string `yaml:"allowHeaders,omitempty"`
+		ExposeHeaders    []string `yaml:"exposeHeaders,omitempty"`
 		AllowCredentials bool     `yaml:"allowCredentials,omitempty"`
-		MaxAge          int      `yaml:"maxAge,omitempty"`
+		MaxAge           int      `yaml:"maxAge,omitempty"`
 	}
 
 	Path struct {
@@ -37,6 +38,14 @@ type (
 		Upgrade    bool   `yaml:"upgrade"`
 		Target     string `yaml:"target"`
 		ListenPort int    `yaml:"listenPort,omitempty"`
+	}
+
+	// TLSRoute is a raw TLS passthrough route. Routy reads the SNI from the
+	// ClientHello and proxies the encrypted TCP stream to Target without
+	// terminating TLS.
+	TLSRoute struct {
+		Host   string `yaml:"host"`
+		Target string `yaml:"target"`
 	}
 )
 

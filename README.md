@@ -68,6 +68,15 @@ domains:
           - location: /
             upgrade: false
             target: https://192.168.0.6:8443
+
+# Optional raw TLS passthrough routes. These share :443 with Routy's
+# normal managed HTTPS routes. Routy reads the TLS SNI hostname and
+# proxies the encrypted stream without terminating TLS.
+tlsRoutes:
+  - host: vault.example.com
+    target: 10.0.0.20:443
+  - host: mqtt.example.com
+    target: tls://10.0.0.30:8883
 ```
 
 ### Deny List
