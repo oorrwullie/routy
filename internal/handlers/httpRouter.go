@@ -56,7 +56,7 @@ func (r *Routy) HttpRouter(routes models.Http) error {
 					targetURL, err := url.Parse(path.Target)
 					if err != nil {
 						msg := fmt.Sprintf("failed to parse target URL for subdomain %s path %s: %v\n", sd.Name, path.Location, err)
-						r.eventLog <- logging.EventLogMessage{
+						r.EventLog <- logging.EventLogMessage{
 							Level:   "ERROR",
 							Caller:  "Route()->url.Parse()",
 							Message: msg,
@@ -85,24 +85,32 @@ func (r *Routy) HttpRouter(routes models.Http) error {
 								log.Printf("Error upgrading connection to WebSocket: %v", err)
 								return
 							}
-							defer conn.Close()
+							defer func() {
+								_ = conn.Close()
+							}()
 
 							targetWs, _, err := websocket.DefaultDialer.Dial(path.Target, req.Header)
 							if err != nil {
 								log.Printf("Error connecting to target server: %v", err)
 								return
 							}
-							defer targetWs.Close()
+							defer func() {
+								_ = targetWs.Close()
+							}()
 
 							go func() {
-								defer targetWs.Close()
-								defer conn.Close()
+								defer func() {
+									_ = targetWs.Close()
+								}()
+								defer func() {
+									_ = conn.Close()
+								}()
 
 								for {
 									_, message, err := conn.ReadMessage()
 									if err != nil {
 										msg := fmt.Sprintf("Error receiving message from client: %v", err)
-										r.eventLog <- logging.EventLogMessage{
+										r.EventLog <- logging.EventLogMessage{
 											Level:   "ERROR",
 											Caller:  "handleWebSocket()->conn.ReadMessage()",
 											Message: msg,
@@ -114,7 +122,7 @@ func (r *Routy) HttpRouter(routes models.Http) error {
 									err = targetWs.WriteMessage(websocket.TextMessage, message)
 									if err != nil {
 										msg := fmt.Sprintf("Error sending message to target server: %v", err)
-										r.eventLog <- logging.EventLogMessage{
+										r.EventLog <- logging.EventLogMessage{
 											Level:   "ERROR",
 											Caller:  "handleWebSocket()->targetWs.WriteMessage()",
 											Message: msg,
@@ -129,7 +137,7 @@ func (r *Routy) HttpRouter(routes models.Http) error {
 								_, message, err := targetWs.ReadMessage()
 								if err != nil {
 									msg := fmt.Sprintf("Error receiving message from target server: %v", err)
-									r.eventLog <- logging.EventLogMessage{
+									r.EventLog <- logging.EventLogMessage{
 										Level:   "ERROR",
 										Caller:  "handleWebSocket()->targetWs.ReadMessage()",
 										Message: msg,
@@ -141,7 +149,7 @@ func (r *Routy) HttpRouter(routes models.Http) error {
 								err = conn.WriteMessage(websocket.TextMessage, message)
 								if err != nil {
 									msg := fmt.Sprintf("Error sending message to client: %v", err)
-									r.eventLog <- logging.EventLogMessage{
+									r.EventLog <- logging.EventLogMessage{
 										Level:   "ERROR",
 										Caller:  "handleWebSocket()->conn.WriteMessage()",
 										Message: msg,
@@ -154,7 +162,13 @@ func (r *Routy) HttpRouter(routes models.Http) error {
 						})
 
 						go func() {
-							http.ListenAndServe(fmt.Sprintf(":%d", path.ListenPort), nil)
+							if err := http.ListenAndServe(fmt.Sprintf(":%d", path.ListenPort), nil); err != nil && err != http.ErrServerClosed {
+								r.EventLog <- logging.EventLogMessage{
+									Level:   "ERROR",
+									Caller:  "HttpRouter()->http.ListenAndServe()",
+									Message: fmt.Sprintf("failed to start websocket server: %v", err),
+								}
+							}
 						}()
 					} else {
 
@@ -195,7 +209,13 @@ func (r *Routy) HttpRouter(routes models.Http) error {
 				Handler: certManager.HTTPHandler(nil),
 			}
 
-			httpServer.ListenAndServe()
+			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				r.EventLog <- logging.EventLogMessage{
+					Level:   "ERROR",
+					Caller:  "HttpRouter()->httpServer.ListenAndServe()",
+					Message: fmt.Sprintf("failed to start http server: %v", err),
+				}
+			}
 		}()
 
 		server := &http.Server{

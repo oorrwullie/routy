@@ -33,46 +33,67 @@ All configuration and log files are found in either `/var/routy` or `$HOME/routy
 The cfg.yaml file contains the configuration for the base hostname and subdomains. A typical configuration including a configuration for a websocket looks like this:
 The timeouts are in milliseconds. All websocket paths are `/ws` on their respective subdomains.
 ```yaml
+domains:
+  - name: example.com
+    paths:
+      - location: /
+        target: http://127.0.0.2
+        upgrade: false
+    subdomains:
+      - name: foo
+        cors:
+          allowOrigins: ["https://app.example.com"]
+          allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          allowHeaders: ["Content-Type", "Authorization"]
+          exposeHeaders: ["X-Request-Id"]
+          allowCredentials: true
+          maxAge: 600
+        paths:
+          - location: /
+            upgrade: false
+            target: http://127.0.0.1
+          - location: /ws
+            upgrade: true
+            target: http://127.0.0.1:1234
+            listenPort: 1234
+  - name: anotherexample.com
+    subdomains:
+      - name: flip
+        paths:
+          - location: /
+            upgrade: false
+            target: http://192.168.0.2
+      - name: flop
+        paths:
+          - location: /
+            upgrade: false
+            target: https://192.168.0.6:8443
+
+# Optional raw TLS passthrough routes. These share :443 with Routy's
+# normal managed HTTPS routes. Routy reads the TLS SNI hostname and
+# proxies the encrypted stream without terminating TLS.
+tlsRoutes:
+  - host: vault.example.com
+    target: 10.0.0.20:443
+  - host: mqtt.example.com
+    target: tls://10.0.0.30:8883
+
 ssh:
-    enabled: true
-    listenPort: 22
-    configs:
-      - domain: example.com
-        host: 127.0.0.2
-        port: 22
-      - domain: foo.example.com
-        host: 127.0.0.1
-        port: 23
-http:
-  domains:
-    - name: example.com
-      paths:
-        - location: /
-          target: http://127.0.0.2
-          upgrade: false
-      subdomains:
-        - name: foo
-          paths:
-            - location: /
-              upgrade: false
-              target: http://127.0.0.1
-            - location: /ws
-              upgrade: true
-              target: http://127.0.0.1:1234
-              listenPort: 1234
-    - name: anotherexample.com
-      subdomains:
-        - name: flip
-          paths:
-            - location: /
-              upgrade: false
-              target: http://192.168.0.2
-        - name: flop
-          paths:
-            - location: /
-              upgrade: false
-              target: https://192.168.0.6:8443
+  enabled: true
+  listenPort: 22
+  configs:
+    - domain: example.com
+      host: 127.0.0.2
+      port: 22
+    - domain: foo.example.com
+      host: 127.0.0.1
+      port: 23
 ```
+
+SSH routes use the SSH username as the route key. For example,
+`ssh example.com@proxy.example.net` routes to the `example.com` SSH target.
+Routy stores its generated SSH host key in the Routy data directory so clients
+see a stable host key across restarts.
 
 ### Deny List
 A typical denyList.json file will look like this:

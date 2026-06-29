@@ -27,7 +27,9 @@ func StartAccessLogger(requestChan <-chan *http.Request) error {
 			request.Header.Get("User-Agent"),
 		)
 
-		m.WriteToAccessLog(entry)
+		if err := m.WriteToAccessLog(entry); err != nil {
+			continue
+		}
 	}
 
 	return nil

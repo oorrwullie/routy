@@ -16,6 +16,10 @@ type Model struct {
 func NewModel() (*Model, error) {
 	var dataDir string
 
+	if envDir := os.Getenv("ROUTY_DATA_DIR"); envDir != "" {
+		return &Model{DataDir: envDir}, nil
+	}
+
 	if _, err := os.Stat("/var/routy"); err == nil {
 		dataDir = "/var/routy"
 	} else {
@@ -42,30 +46,18 @@ func (m *Model) getFileData(filename string) ([]byte, error) {
 
 	file, err := os.Open(fp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %v\n", err)
+		return nil, fmt.Errorf("failed to open file: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %v\n", err)
+		return nil, fmt.Errorf("failed to read file: %v", err)
 	}
 
 	return data, nil
-}
-
-func (m *Model) overwriteFile(filename string, data []byte) error {
-	fp, err := m.GetFilepath(filename)
-	if err != nil {
-		return err
-	}
-
-	err = os.WriteFile(fp, data, 0600)
-	if err != nil {
-		return fmt.Errorf("unable to overwrite file: %v", err)
-	}
-
-	return nil
 }
 
 func (m *Model) appendToFile(filename string, data string) error {
@@ -78,7 +70,9 @@ func (m *Model) appendToFile(filename string, data string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	_, err = file.WriteString(data)
 	if err != nil {

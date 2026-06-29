@@ -8,8 +8,9 @@ const configFilename string = "cfg.yaml"
 
 type (
 	Routes struct {
-		Http Http `yaml:"http"`
-		Ssh  Ssh  `yaml:"ssh"`
+		Domains   []Domain   `yaml:"domains"`
+		TLSRoutes []TLSRoute `yaml:"tlsRoutes,omitempty"`
+		Ssh       Ssh        `yaml:"ssh,omitempty"`
 	}
 
 	Http struct {
@@ -23,8 +24,18 @@ type (
 	}
 
 	Subdomain struct {
-		Name  string `yaml:"name"`
-		Paths []Path `yaml:"paths"`
+		Name  string      `yaml:"name"`
+		CORS  *CORSConfig `yaml:"cors,omitempty"`
+		Paths []Path      `yaml:"paths"`
+	}
+
+	CORSConfig struct {
+		AllowOrigins     []string `yaml:"allowOrigins,omitempty"`
+		AllowMethods     []string `yaml:"allowMethods,omitempty"`
+		AllowHeaders     []string `yaml:"allowHeaders,omitempty"`
+		ExposeHeaders    []string `yaml:"exposeHeaders,omitempty"`
+		AllowCredentials bool     `yaml:"allowCredentials,omitempty"`
+		MaxAge           int      `yaml:"maxAge,omitempty"`
 	}
 
 	Path struct {
@@ -41,8 +52,17 @@ type (
 	}
 
 	SshConfig struct {
-		Host string `yaml:"host"`
-		Port int    `yaml:"port"`
+		Domain string `yaml:"domain,omitempty"`
+		Host   string `yaml:"host"`
+		Port   int    `yaml:"port"`
+	}
+
+	// TLSRoute is a raw TLS passthrough route. Routy reads the SNI from the
+	// ClientHello and proxies the encrypted TCP stream to Target without
+	// terminating TLS.
+	TLSRoute struct {
+		Host   string `yaml:"host"`
+		Target string `yaml:"target"`
 	}
 )
 
