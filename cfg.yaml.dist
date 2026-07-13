@@ -42,3 +42,14 @@ tlsRoutes:
     target: 10.0.0.20:443
   - host: mqtt.example.com
     target: tls://10.0.0.30:8883
+
+ssh:
+  enabled: true
+  listenPort: 22
+  configs:
+    - domain: example.com
+      host: 127.0.0.2
+      port: 22
+    - domain: foo.example.com
+      host: 127.0.0.1
+      port: 23

@@ -74,6 +74,12 @@ func (r *Routy) Route() error {
 		return err
 	}
 
+	if r.routes.Ssh.Enabled {
+		g.Go(func() error {
+			return r.sshRouter(r.routes.Ssh.ListenPort, r.routes.Ssh.Configs)
+		})
+	}
+
 	r.registerHTTPRoutes(router)
 
 	// Listen for plain HTTP traffic and redirect/challenge through autocert.
