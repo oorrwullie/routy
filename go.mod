@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/gorilla/mux v1.8.1
-	github.com/gorilla/websocket v1.5.1
+	github.com/gorilla/websocket v1.5.3
 	golang.org/x/crypto v0.53.0
 	golang.org/x/sync v0.21.0
 	gopkg.in/yaml.v2 v2.4.0
