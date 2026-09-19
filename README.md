@@ -77,7 +77,23 @@ tlsRoutes:
     target: 10.0.0.20:443
   - host: mqtt.example.com
     target: tls://10.0.0.30:8883
+
+ssh:
+  enabled: true
+  listenPort: 22
+  configs:
+    - domain: example.com
+      host: 127.0.0.2
+      port: 22
+    - domain: foo.example.com
+      host: 127.0.0.1
+      port: 23
 ```
+
+SSH routes use the SSH username as the route key. For example,
+`ssh example.com@proxy.example.net` routes to the `example.com` SSH target.
+Routy stores its generated SSH host key in the Routy data directory so clients
+see a stable host key across restarts.
 
 ### Deny List
 A typical denyList.json file will look like this:
